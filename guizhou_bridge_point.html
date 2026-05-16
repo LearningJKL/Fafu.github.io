@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>贵州省著名桥梁地图</title>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    }
+
+    #app {
+      display: flex;
+      height: 100%;
+      width: 100%;
+    }
+
+    #mapArea {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+    }
+
+    #viewDiv {
+      height: 100%;
+      width: 100%;
+    }
+
+    #sidePanel {
+      width: 360px;
+      flex-shrink: 0;
+      background: #fff;
+      border-left: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08);
+      z-index: 50;
+    }
+
+    #sidePanelHeader {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e8e8e8;
+      background: linear-gradient(180deg, #f8fafc, #fff);
+    }
+
+    #sidePanelHeader h2 {
+      margin: 0 0 4px;
+      font-size: 17px;
+      color: #1a1a1a;
+    }
+
+    #sidePanelHeader p {
+      margin: 0;
+      font-size: 12px;
+      color: #888;
+    }
+
+    #sidePanelContent {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #bridgeInfo {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #sidePanelEmpty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      color: #999;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    #sidePanelEmpty.hidden,
+    #bridgeInfo.hidden {
+      display: none;
+    }
+
+    #mapToolbar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 280px;
+    }
+
+    .map-tool-card {
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      padding: 10px 12px;
+    }
+
+    .map-tool-card h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    #basemapSelector {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .layer-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #444;
+      cursor: pointer;
+    }
+
+    .layer-item:last-child {
+      margin-bottom: 0;
+    }
+
+    #searchRow {
+      display: flex;
+      gap: 6px;
+    }
+
+    #bridgeSearchInput {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    #bridgeSearchBtn {
+      padding: 6px 12px;
+      font-size: 13px;
+      border: none;
+      border-radius: 4px;
+      background: #1976d2;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #bridgeSearchBtn:hover {
+      background: #1565c0;
+    }
+
+    #searchHint {
+      margin: 6px 0 0;
+      font-size: 11px;
+      color: #999;
+    }
+
+    .bridge-popup {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      color: #333;
+    }
+
+    .bridge-popup-tabs {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid #e0e0e0;
+      margin: 0 16px;
+    }
+
+    .bridge-popup-tabs button {
+      flex: 1;
+      padding: 10px 4px;
+      border: none;
+      background: transparent;
+      font-size: 13px;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .bridge-popup-tabs button.active {
+      color: #1976d2;
+      border-bottom-color: #1976d2;
+      font-weight: 600;
+    }
+
+    .bridge-popup-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 20px;
+    }
+
+    .bridge-popup-panel {
+      display: none;
+    }
+
+    .bridge-popup-panel.active {
+      display: block;
+    }
+
+    .bridge-info-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .bridge-info-table th,
+    .bridge-info-table td {
+      padding: 8px;
+      border-bottom: 1px solid #f0f0f0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .bridge-info-table th {
+      width: 76px;
+      color: #888;
+      font-weight: 500;
+    }
+
+    .bridge-detail-text {
+      font-size: 13px;
+      line-height: 1.75;
+      color: #444;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+  <script src="bridge_media.js"></script>
+  <script src="https://js.arcgis.com/4.30/"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="mapArea">
+      <div id="viewDiv"></div>
+      <div id="mapToolbar">
+        <div class="map-tool-card">
+          <h3>底图</h3>
+          <select id="basemapSelector" aria-label="选择底图">
+            <option value="streets">街道图（Streets）</option>
+            <option value="topo">地形图（Topographic）</option>
+            <option value="satellite">卫星图（Satellite）</option>
+            <option value="hybrid">混合图（Hybrid）</option>
+            <option value="oceans">海洋图（Oceans）</option>
+            <option value="gray">灰色底图（Gray）</option>
+            <option value="dark-gray">深灰底图（Dark Gray）</option>
+          </select>
+        </div>
+        <div class="map-tool-card">
+          <h3>图层</h3>
+          <label class="layer-item"><input type="checkbox" id="layerBoundary" checked /> 贵州省市界（面）</label>
+          <label class="layer-item"><input type="checkbox" id="layerRoad" checked /> 道路数据</label>
+          <label class="layer-item"><input type="checkbox" id="layerBridge" checked /> 著名桥梁（点）</label>
+        </div>
+        <div class="map-tool-card">
+          <h3>桥梁搜索</h3>
+          <div id="searchRow">
+            <input id="bridgeSearchInput" type="search" placeholder="输入桥梁名称…" list="bridgeNameList" />
+            <button id="bridgeSearchBtn" type="button">定位</button>
+          </div>
+          <datalist id="bridgeNameList"></datalist>
+          <p id="searchHint">支持模糊搜索，定位后右侧显示详情</p>
+        </div>
+      </div>
+    </div>
+    <aside id="sidePanel">
+      <div id="sidePanelHeader">
+        <h2 id="sidePanelTitle">桥梁信息</h2>
+        <p id="sidePanelSubtitle">点击地图上的定位符查看详情</p>
+      </div>
+      <div id="sidePanelContent">
+        <div id="sidePanelEmpty">请在左侧地图中点击桥梁定位符，<br />或使用搜索定位到某座桥梁。</div>
+        <div id="bridgeInfo" class="bridge-popup hidden"></div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/symbols/PictureMarkerSymbol",
+      "esri/symbols/SimpleMarkerSymbol",
+      "esri/renderers/SimpleRenderer",
+      "esri/renderers/UniqueValueRenderer",
+      "esri/layers/support/LabelClass",
+      "esri/widgets/ScaleBar",
+      "esri/widgets/Compass",
+      "esri/rest/support/Query"
+    ], function (
+      Map, MapView, FeatureLayer, PictureMarkerSymbol, SimpleMarkerSymbol,
+      SimpleRenderer, UniqueValueRenderer, LabelClass, ScaleBar, Compass, Query
+    ) {
+      var SERVICE_URLS = {
+        bridgeBoundary: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省桥梁市界/FeatureServer",
+        road: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2026道路数据/FeatureServer"
+      };
+
+      var PIN_RED_SVG =
+        "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">' +
+          '<path fill="#E53935" stroke="#B71C1C" stroke-width="1" d="M16 0C7.2 0 0 7.2 0 16c0 12 16 26 16 26s16-14 16-26C32 7.2 24.8 0 16 0z"/>' +
+          '<circle cx="16" cy="16" r="7" fill="#fff"/>' +
+          '<circle cx="16" cy="16" r="4" fill="#E53935"/>' +
+          '</svg>'
+        );
+
+      var PIN_BLUE_SVG =
+        "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">' +
+          '<path fill="#1976D2" stroke="#0D47A1" stroke-width="1" d="M16 0C7.2 0 0 7.2 0 16c0 12 16 26 16 26s16-14 16-26C32 7.2 24.8 0 16 0z"/>' +
+          '<circle cx="16" cy="16" r="7" fill="#fff"/>' +
+          '<circle cx="16" cy="16" r="4" fill="#1976D2"/>' +
+          '</svg>'
+        );
+
+      var PIN_W = 16;
+      var PIN_H = 21;
+      var PIN_Y = 10.5;
+
+      var redPinSymbol = new PictureMarkerSymbol({
+        url: PIN_RED_SVG,
+        width: PIN_W,
+        height: PIN_H,
+        yoffset: PIN_Y
+      });
+
+      var bluePinSymbol = new PictureMarkerSymbol({
+        url: PIN_BLUE_SVG,
+        width: PIN_W,
+        height: PIN_H,
+        yoffset: PIN_Y
+      });
+
+      var BRIDGE_MEDIA = window.BRIDGE_MEDIA || {};
+      var selectedFid = null;
+      var bridgeNameList = [];
+      var highlightHandle = null;
+
+      function escapeHtml(value) {
+        if (value == null) return "—";
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function cleanDetail(text) {
+        if (!text) return "";
+        return String(text)
+          .replace(/更多图文资料[\s\S]*/g, "")
+          .replace(/最后由\s*[\s\S]*?编辑。?/g, "")
+          .trim();
+      }
+
+      function getBridgeMedia(attrs) {
+        var name = attrs["大桥名"] || "";
+        var custom = BRIDGE_MEDIA[name];
+        var detail = cleanDetail(custom && custom.detail ? custom.detail : attrs["核心特"] || "暂无详细介绍。");
+        return { detail: detail };
+      }
+
+      function buildBridgeInfoDom(attrs) {
+        var media = getBridgeMedia(attrs);
+        var container = document.createElement("div");
+        container.className = "bridge-popup";
+
+        container.innerHTML =
+          '<div class="bridge-popup-tabs">' +
+          '<button type="button" class="active" data-tab="info">基本信息</button>' +
+          '<button type="button" data-tab="detail">桥梁详情</button>' +
+          '</div>' +
+          '<div class="bridge-popup-body">' +
+          '<div class="bridge-popup-panel active" data-panel="info">' +
+          '<table class="bridge-info-table">' +
+          "<tr><th>序号</th><td>" + escapeHtml(attrs["序号"]) + "</td></tr>" +
+          "<tr><th>大桥名</th><td>" + escapeHtml(attrs["大桥名"]) + "</td></tr>" +
+          "<tr><th>连接区域</th><td>" + escapeHtml(attrs["连接区"]) + "</td></tr>" +
+          "<tr><th>核心特点</th><td>" + escapeHtml(attrs["核心特"]) + "</td></tr>" +
+          "<tr><th>经度</th><td>" + escapeHtml(attrs["经度"]) + "</td></tr>" +
+          "<tr><th>纬度</th><td>" + escapeHtml(attrs["纬度"]) + "</td></tr>" +
+          "</table></div>" +
+          '<div class="bridge-popup-panel" data-panel="detail">' +
+          '<div class="bridge-detail-text">' + escapeHtml(media.detail) + "</div>" +
+          "</div></div>";
+
+        container.addEventListener("click", function (e) {
+          var tabBtn = e.target.closest("[data-tab]");
+          if (!tabBtn) return;
+          var tab = tabBtn.getAttribute("data-tab");
+          container.querySelectorAll(".bridge-popup-tabs button").forEach(function (btn) {
+            btn.classList.toggle("active", btn.getAttribute("data-tab") === tab);
+          });
+          container.querySelectorAll(".bridge-popup-panel").forEach(function (panel) {
+            panel.classList.toggle("active", panel.getAttribute("data-panel") === tab);
+          });
+          var scrollBody = container.querySelector(".bridge-popup-body");
+          if (scrollBody) scrollBody.scrollTop = 0;
+        });
+
+        return container;
+      }
+
+      function showSidePanel(attrs) {
+        document.getElementById("sidePanelEmpty").classList.add("hidden");
+        var infoEl = document.getElementById("bridgeInfo");
+        infoEl.classList.remove("hidden");
+        infoEl.innerHTML = "";
+        infoEl.appendChild(buildBridgeInfoDom(attrs));
+        document.getElementById("sidePanelTitle").textContent = attrs["大桥名"] || "桥梁信息";
+        document.getElementById("sidePanelSubtitle").textContent = "序号 " + (attrs["序号"] != null ? attrs["序号"] : "—");
+      }
+
+      function clearSidePanel() {
+        document.getElementById("sidePanelEmpty").classList.remove("hidden");
+        document.getElementById("bridgeInfo").classList.add("hidden");
+        document.getElementById("sidePanelTitle").textContent = "桥梁信息";
+        document.getElementById("sidePanelSubtitle").textContent = "点击地图上的定位符查看详情";
+      }
+
+      function buildBridgeRenderer(fid) {
+        if (fid == null) {
+          return new SimpleRenderer({ symbol: redPinSymbol });
+        }
+        return new UniqueValueRenderer({
+          field: "fid",
+          uniqueValueInfos: [{
+            value: fid,
+            symbol: bluePinSymbol
+          }],
+          defaultSymbol: redPinSymbol
+        });
+      }
+
+      var bridgeLabelClass = new LabelClass({
+        labelExpressionInfo: {
+          expression: "IIF(LENGTH($feature.大桥名)>10, LEFT($feature.大桥名, 10) + '…', $feature.大桥名)"
+        },
+        symbol: {
+          type: "text",
+          color: "#333333",
+          haloColor: "#ffffff",
+          haloSize: 1.5,
+          font: { size: 10, family: "Microsoft YaHei", weight: "bold" }
+        },
+        labelPlacement: "below-center",
+        labelPosition: "curved",
+        maxScale: 0,
+        minScale: 250000
+      });
+
+      var bridgePointLayer = new FeatureLayer({
+        url: SERVICE_URLS.bridgeBoundary + "/0",
+        title: "著名桥梁（点）",
+        outFields: ["*"],
+        renderer: buildBridgeRenderer(null),
+        labelsVisible: true,
+        labelingInfo: [bridgeLabelClass],
+        popupEnabled: false,
+        featureReduction: {
+          type: "cluster",
+          clusterRadius: "60px",
+          clusterMinSize: 22,
+          clusterMaxSize: 52,
+          popupEnabled: false,
+          labelingInfo: [{
+            deconflictionStrategy: "none",
+            labelExpressionInfo: {
+              expression: "$feature.cluster_count"
+            },
+            symbol: {
+              type: "text",
+              color: "#ffffff",
+              font: { size: 11, weight: "bold", family: "Microsoft YaHei" },
+              haloColor: "#1976d2",
+              haloSize: 1
+            },
+            labelPlacement: "center-center"
+          }],
+          symbol: new SimpleMarkerSymbol({
+            style: "circle",
+            color: [25, 118, 210, 0.85],
+            size: 28,
+            outline: { color: [255, 255, 255, 0.9], width: 1.5 }
+          })
+        }
+      });
+
+      var boundaryPolygonLayer = new FeatureLayer({
+        url: SERVICE_URLS.bridgeBoundary + "/1",
+        title: "贵州省市界（面）",
+        outFields: ["*"],
+        popupEnabled: false
+      });
+
+      var roadLayer = new FeatureLayer({
+        url: SERVICE_URLS.road + "/0",
+        title: "贵州省2026道路数据",
+        outFields: ["*"],
+        popupEnabled: false
+      });
+
+      var map = new Map({
+        basemap: "streets",
+        layers: [boundaryPolygonLayer, roadLayer, bridgePointLayer]
+      });
+
+      var view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: [106.7, 26.6],
+        zoom: 7
+      });
+
+      var scaleBar = new ScaleBar({ view: view, unit: "metric" });
+      var compass = new Compass({ view: view });
+      view.ui.add(scaleBar, { position: "bottom-left", index: 0 });
+      view.ui.add(compass, { position: "top-right", index: 0 });
+
+      function clearHighlight() {
+        if (highlightHandle) {
+          highlightHandle.remove();
+          highlightHandle = null;
+        }
+      }
+
+      function selectBridgeGraphic(graphic, options) {
+        options = options || {};
+        if (!graphic || !graphic.attributes) return;
+
+        var attrs = graphic.attributes;
+        var fid = attrs.fid;
+        selectedFid = fid;
+        bridgePointLayer.renderer = buildBridgeRenderer(fid);
+        showSidePanel(attrs);
+
+        clearHighlight();
+        view.whenLayerView(bridgePointLayer).then(function (layerView) {
+          highlightHandle = layerView.highlight(graphic);
+        });
+
+        if (options.zoom !== false) {
+          view.goTo({
+            target: graphic,
+            zoom: options.zoomLevel || Math.max(view.zoom, 11)
+          }, { duration: 800 });
+        }
+      }
+
+      function clearSelection() {
+        selectedFid = null;
+        bridgePointLayer.renderer = buildBridgeRenderer(null);
+        clearHighlight();
+        clearSidePanel();
+      }
+
+      function searchBridge(keyword) {
+        keyword = (keyword || "").trim();
+        if (!keyword) return Promise.resolve(false);
+
+        var q = new Query({
+          where: "大桥名 LIKE '%" + keyword.replace(/'/g, "''") + "%'",
+          outFields: ["*"],
+          returnGeometry: true,
+          num: 1
+        });
+
+        return bridgePointLayer.queryFeatures(q).then(function (result) {
+          if (!result.features.length) return false;
+          selectBridgeGraphic(result.features[0], { zoom: true, zoomLevel: 12 });
+          return true;
+        });
+      }
+
+      function loadBridgeNameList() {
+        return bridgePointLayer.queryFeatures({
+          where: "1=1",
+          outFields: ["大桥名"],
+          returnGeometry: false,
+          num: 2000
+        }).then(function (result) {
+          bridgeNameList = result.features
+            .map(function (f) { return f.attributes["大桥名"]; })
+            .filter(Boolean)
+            .sort();
+          var datalist = document.getElementById("bridgeNameList");
+          datalist.innerHTML = bridgeNameList.map(function (n) {
+            return "<option value=\"" + escapeHtml(n) + "\"></option>";
+          }).join("");
+        });
+      }
+
+      document.getElementById("basemapSelector").addEventListener("change", function (e) {
+        map.basemap = e.target.value;
+      });
+
+      document.getElementById("layerBoundary").addEventListener("change", function (e) {
+        boundaryPolygonLayer.visible = e.target.checked;
+      });
+
+      document.getElementById("layerRoad").addEventListener("change", function (e) {
+        roadLayer.visible = e.target.checked;
+      });
+
+      document.getElementById("layerBridge").addEventListener("change", function (e) {
+        bridgePointLayer.visible = e.target.checked;
+      });
+
+      document.getElementById("bridgeSearchBtn").addEventListener("click", function () {
+        var kw = document.getElementById("bridgeSearchInput").value;
+        searchBridge(kw).then(function (found) {
+          if (!found) alert("未找到匹配的桥梁，请更换关键词。");
+        });
+      });
+
+      document.getElementById("bridgeSearchInput").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          document.getElementById("bridgeSearchBtn").click();
+        }
+      });
+
+      view.when(function () {
+        view.popup.autoOpenEnabled = false;
+
+        view.on("click", function (event) {
+          view.hitTest(event).then(function (response) {
+            var bridgeHit = null;
+            var clusterHit = null;
+
+            response.results.forEach(function (hit) {
+              if (hit.graphic && hit.graphic.layer === bridgePointLayer) {
+                if (hit.graphic.isAggregate) {
+                  clusterHit = hit.graphic;
+                } else {
+                  bridgeHit = hit.graphic;
+                }
+              }
+            });
+
+            if (bridgeHit) {
+              selectBridgeGraphic(bridgeHit, { zoom: false });
+              return;
+            }
+
+            if (clusterHit) {
+              view.goTo({
+                target: clusterHit.geometry,
+                zoom: view.zoom + 2
+              });
+              return;
+            }
+
+            clearSelection();
+          });
+        });
+
+        loadBridgeNameList();
+
+        return boundaryPolygonLayer.when(function () {
+          return boundaryPolygonLayer.queryExtent();
+        });
+      }).then(function (result) {
+        if (result && result.extent && !result.extent.isEmpty) {
+          return view.goTo(result.extent.expand(1.08));
+        }
+      }).catch(function (err) {
+        console.warn("初始化失败:", err);
+      });
+    });
+  </script>
+</body>
+</html>
