@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>贵州桥梁建设编年史 · 交互式地图叙事</title>
+  <!-- Font Awesome 图标（CDN，无本地图片） -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
+  <style>
+    /* ========== 桥梁主题配色（钢灰、混凝土、江蓝、锈橙） ========== */
+    :root {
+      --bg-deep: #3d4a56;
+      --bg-warm: #5c6b7a;
+      --bg-panel: #f4f1eb;
+      --steel: #6b7d8f;
+      --steel-dark: #4a5d6e;
+      --river-blue: #4a7c9b;
+      --rust: #b85c38;
+      --rust-light: #d4845c;
+      --concrete: #e8e4dc;
+      --forest: #5a7a5c;
+      --text-primary: #2c3338;
+      --text-muted: #5c6570;
+      --border-soft: 1px solid #a8b4c0;
+      --shadow-soft: 0 4px 16px rgba(44, 51, 56, 0.12);
+      --header-h: 68px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(160deg, #4a5d6e 0%, #5c6b7a 45%, #6b7d8f 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .app-header {
+      position: relative;
+      z-index: 10;
+      height: var(--header-h);
+      padding: 6px 24px;
+      text-align: center;
+      border-bottom: var(--border-soft);
+      background: linear-gradient(180deg, #f4f1eb, #e8e4dc);
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .app-header h1 {
+      font-size: 1.85rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      line-height: 1.15;
+      color: var(--steel-dark);
+      white-space: nowrap;
+    }
+
+    .app-header p {
+      font-size: 0.88rem;
+      line-height: 1.2;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ========== 主布局：地图自适应撑满 + 固定宽度侧栏 ========== */
+    .main-layout {
+      display: flex;
+      height: calc(100vh - var(--header-h) - 130px);
+      position: relative;
+      z-index: 1;
+    }
+
+    .map-wrapper {
+      flex: 1 1 auto;
+      min-width: 0;
+      position: relative;
+      padding: 8px 8px 8px 12px;
+    }
+
+    .map-frame {
+      width: 100%;
+      height: 100%;
+      border-radius: 10px;
+      border: var(--border-soft);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      opacity: 0;
+      transform: scale(0.98);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+
+    .map-frame.loaded {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    #mapContainer {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 地图上方实时经纬度显示 */
+    .map-coord-bar {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 110;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--steel-dark);
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid var(--steel);
+      border-radius: 6px;
+      box-shadow: var(--shadow-soft);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .map-coord-bar i {
+      color: var(--river-blue);
+      font-size: 0.85rem;
+    }
+
+    /* 地图左侧桥梁图片弹窗 */
+    .bridge-img-popup {
+      position: absolute;
+      left: 24px;
+      top: 50%;
+      transform: translateY(-50%) translateX(-12px);
+      z-index: 105;
+      width: 280px;
+      background: var(--bg-panel);
+      border: var(--border-soft);
+      border-radius: 10px;
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, transform 0.4s ease, visibility 0.4s;
+      pointer-events: auto;
+    }
+
+    .bridge-img-popup.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(-50%) translateX(0);
+    }
+
+    .bridge-img-popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, #e8e4dc, #f4f1eb);
+      border-bottom: var(--border-soft);
+    }
+
+    .bridge-img-popup-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--steel-dark);
+      line-height: 1.3;
+      flex: 1;
+      padding-right: 8px;
+    }
+
+    .bridge-img-popup-year {
+      font-size: 0.7rem;
+      color: #fff;
+      background: var(--rust);
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .bridge-img-popup-body {
+      position: relative;
+      width: 100%;
+      min-height: 160px;
+      background: #d4cfc4;
+    }
+
+    .bridge-img-popup-body img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 220px;
+      object-fit: cover;
+      vertical-align: middle;
+    }
+
+    .bridge-img-popup-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: #e8e4dc;
+    }
+
+    .bridge-img-popup-error {
+      padding: 24px 16px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* 控制按钮组 */
+    .map-controls {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    .btn-tech {
+      padding: 8px 14px;
+      font-size: 0.75rem;
+      color: var(--steel-dark);
+      background: rgba(244, 241, 235, 0.95);
+      border: 1px solid var(--steel);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .btn-tech:hover {
+      background: #fff;
+      border-color: var(--river-blue);
+      color: var(--river-blue);
+      transform: translateY(-1px);
+    }
+
+    .btn-tech.active {
+      background: var(--rust);
+      border-color: var(--rust);
+      color: #fff;
+    }
+
+    /* ========== 右侧信息面板（固定宽度，地图占据剩余空间） ========== */
+    .info-panel {
+      flex: 0 0 240px;
+      width: 240px;
+      padding: 8px 12px 8px 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-card {
+      flex: 1;
+      background: var(--bg-panel);
+      border: var(--border-soft);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: border-color 0.35s ease, box-shadow 0.35s ease;
+    }
+
+    .panel-card.highlight {
+      border-color: var(--rust);
+      box-shadow: 0 4px 20px rgba(184, 92, 56, 0.2);
+    }
+
+    .bridge-icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #e8e4dc, #d4cfc4);
+      border: 2px solid var(--steel);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      color: var(--rust);
+      margin-bottom: 12px;
+    }
+
+    .year-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      color: var(--rust);
+      border: 1px solid var(--rust-light);
+      background: rgba(184, 92, 56, 0.08);
+      border-radius: 20px;
+      margin-bottom: 8px;
+      letter-spacing: 0.06em;
+    }
+
+    .bridge-title {
+      font-size: 1.15rem;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+      line-height: 1.35;
+    }
+
+    .bridge-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .bridge-desc {
+      flex: 1;
+      font-size: 0.9rem;
+      line-height: 1.75;
+      color: var(--text-muted);
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .bridge-desc::-webkit-scrollbar { width: 4px; }
+    .bridge-desc::-webkit-scrollbar-thumb {
+      background: var(--steel);
+      border-radius: 4px;
+    }
+
+    /* ========== 底部时间轴（年份与滑条两端/刻度对齐） ========== */
+    .timeline-section {
+      position: relative;
+      z-index: 10;
+      height: 130px;
+      padding: 10px 24px 16px;
+      background: linear-gradient(0deg, #e8e4dc, #f4f1eb);
+      border-top: var(--border-soft);
+    }
+
+    .timeline-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      padding: 0 11px; /* 与滑块 thumb 半宽对齐 */
+    }
+
+    .timeline-track-wrap {
+      position: relative;
+      padding: 10px 11px 40px; /* 左右 padding 使滑块与刻度对齐 */
+    }
+
+    input[type="range"]#yearSlider {
+      width: 100%;
+      height: 8px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: linear-gradient(90deg, var(--steel) 0%, var(--river-blue) 50%, var(--rust-light) 100%);
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]#yearSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--rust);
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(44, 51, 56, 0.25);
+      cursor: grab;
+      transition: transform 0.2s;
+    }
+
+    input[type="range"]#yearSlider::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+    }
+
+    input[type="range"]#yearSlider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--rust);
+      border: 2px solid #fff;
+      cursor: grab;
+    }
+
+    /* 年份刻度：按 2000–2025 比例绝对定位，与滑条对齐 */
+    .year-ticks {
+      position: absolute;
+      left: 11px;
+      right: 11px;
+      bottom: 4px;
+      height: 32px;
+      pointer-events: none;
+    }
+
+    .year-tick {
+      position: absolute;
+      transform: translateX(-50%);
+      padding: 3px 6px;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      background: rgba(244, 241, 235, 0.95);
+      border: 1px solid #c5cdd5;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      pointer-events: auto;
+    }
+
+    .year-tick:hover,
+    .year-tick.active {
+      color: #fff;
+      background: var(--rust);
+      border-color: var(--rust);
+    }
+
+    .current-year-display {
+      flex: 1;
+      text-align: center;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--rust);
+    }
+
+    /* 百度地图信息窗口自定义样式 */
+    .BMap_bubble_pop,
+    .BMap_bubble_content {
+      background: transparent !important;
+      border: none !important;
+    }
+
+    /* 地图弹窗：加宽、不限行数，过长时内部滚动 */
+    .BMap_bubble_pop > img,
+    .BMap_bubble_pop .BMap_bubble_top img {
+      display: none;
+    }
+
+    .BMap_bubble_content {
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+      max-height: 520px !important;
+      height: auto !important;
+    }
+
+    .custom-infowindow {
+      width: 380px;
+      box-sizing: border-box;
+      padding: 16px 18px;
+      background: #f4f1eb;
+      border: 1px solid #a8b4c0;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(44, 51, 56, 0.15);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.75;
+    }
+
+    .custom-infowindow h4 {
+      color: var(--steel-dark);
+      margin-bottom: 8px;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .custom-infowindow .iw-tag {
+      display: inline-block;
+      color: var(--rust);
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      padding: 2px 8px;
+      background: rgba(184, 92, 56, 0.1);
+      border-radius: 4px;
+    }
+
+    .custom-infowindow .iw-body {
+      margin: 0;
+      white-space: normal;
+      word-break: break-word;
+      max-height: none;
+      overflow: visible;
+    }
+
+    .custom-infowindow .iw-note {
+      font-size: 11px;
+      color: #5a7a5c;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed #c5cdd5;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      inset: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(244, 241, 235, 0.85);
+      border-radius: 10px;
+      z-index: 50;
+      transition: opacity 0.5s;
+    }
+
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .loader {
+      width: 44px;
+      height: 44px;
+      border: 3px solid #d4cfc4;
+      border-top-color: var(--rust);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ak-hint {
+      font-size: 0.62rem;
+      color: #8b5a3c;
+      margin-top: 8px;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <h1>贵州桥梁建设编年史</h1>
+    <p>2000 — 2025 · 黔山天堑变通途 · 交互式地图叙事</p>
+  </header>
+
+  <div class="main-layout">
+    <!-- 地图区域（自适应撑满中间区域） -->
+    <div class="map-wrapper">
+      <div class="map-controls">
+        <button class="btn-tech" id="btnPlay" title="自动逐年播放"><i class="fas fa-play"></i> 播放动画</button>
+        <button class="btn-tech" id="btnReset" title="恢复贵州省全景"><i class="fas fa-compress-arrows-alt"></i> 重置地图</button>
+        <button class="btn-tech" id="btnMapMode" title="切换普通/卫星/三维"><i class="fas fa-layer-group"></i> 切换地图模式</button>
+      </div>
+
+      <div class="map-controls" style="top: auto; bottom: 24px; left: 24px;">
+        <span class="btn-tech" id="mapModeLabel" style="cursor: default;">模式：普通</span>
+      </div>
+
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+      </div>
+
+      <!-- 左侧桥梁图片弹窗：跳转桥梁时展示对应实景图 -->
+      <div class="bridge-img-popup" id="bridgeImgPopup">
+        <div class="bridge-img-popup-header">
+          <span class="bridge-img-popup-title" id="bridgeImgTitle">桥梁名称</span>
+          <span class="bridge-img-popup-year" id="bridgeImgYear">2000</span>
+        </div>
+        <div class="bridge-img-popup-body" id="bridgeImgBody">
+          <div class="bridge-img-popup-loading" id="bridgeImgLoading">图片加载中…</div>
+          <img id="bridgeImgEl" alt="桥梁实景图" />
+        </div>
+      </div>
+
+      <div class="map-frame" id="mapFrame">
+        <div class="map-coord-bar" id="mapCoordBar">
+          <i class="fas fa-crosshairs"></i>
+          <span id="mapCoordText">经度 —°　纬度 —°</span>
+        </div>
+        <div id="mapContainer"></div>
+      </div>
+    </div>
+
+    <!-- 右侧信息面板（固定 240px 宽） -->
+    <aside class="info-panel">
+      <div class="panel-card" id="infoPanel">
+        <div class="bridge-icon-wrap" id="bridgeYearShort">00</div>
+        <span class="year-badge" id="displayYear">2000</span>
+        <h2 class="bridge-title" id="displayName">请选择年份</h2>
+        <p class="bridge-meta" id="displayMeta">拖动时间轴或点击年份按钮探索贵州桥梁发展史</p>
+        <div class="bridge-desc" id="displayDesc">
+          本页面汇集贵州代表性桥梁建设节点，涵盖北盘江、坝陵河、平塘特大桥等标志性工程。
+          通过底部时间轴可纵览2000年至2025年间黔地交通基础设施的跨越式发展。
+          点击「播放动画」可自动逐年浏览贵州桥梁建设历程。
+        </div>
+        <p class="ak-hint" id="akHint"></p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 底部时间轴 -->
+  <section class="timeline-section">
+    <div class="timeline-label">
+      <span>2000</span>
+      <span class="current-year-display" id="sliderYearText">2000 年</span>
+      <span>2025</span>
+    </div>
+    <div class="timeline-track-wrap">
+      <input type="range" id="yearSlider" min="2000" max="2025" value="2000" step="1" />
+      <div class="year-ticks" id="yearTicks"></div>
+    </div>
+  </section>
+
+  <!--
+    百度地图 JavaScript API（WebGL 版，对应 v3.0 三维能力）
+    请将 YOUR_BAIDU_MAP_AK 替换为您在百度地图开放平台申请的密钥；
+    下方已按用户提供的示例写入密钥，部署时可自行更换。
+  -->
+  <script src="https://api.map.baidu.com/api?type=webgl&v=1.0&ak=xhldCkmJHJM7LEs1fvSpe7z5lILxF8MF"></script>
+
+  <script>
+    /* ============================================================
+     * 贵州代表性桥梁数据集
+     * 字段：year, actualYear, name, lng, lat, type, icon, desc（右侧栏介绍）
+     *       popupDesc（地图弹窗专用，侧重为民服务，与 desc 内容不同）
+     *       image（左侧图片弹窗实景图 URL）
+     * 坐标为桥梁大致中心点，便于地图定位
+     * ============================================================ */
+    const BRIDGES = [
+      {
+        year: 2000,
+        actualYear: 2000,
+        name: "红枫湖大桥",
+        lng: 106.4463,
+        lat: 26.5340,
+        type: "公路桥",
+        icon: "fa-water",
+        note: "",
+        desc: "红枫湖大桥坐落于贵阳清镇红枫湖风景区，是早期连接湖区两岸的重要通道。桥梁横跨烟波浩渺的红枫湖，与喀斯特山水融为一体，成为黔中旅游区交通节点。其建设改善了环湖路网，为后续贵黄、沪昆等干线通道储备了区域联通经验，是贵州21世纪初公路桥梁建设的代表性作品之一。",
+        popupDesc: "【便民出行】环湖村寨村民去清镇、贵阳卖农货、就医不必再绕远路乘船或走崎岖山路。【旅游服务】游客从贵阳方向直达红枫湖、百花湖景区，周末自驾一日游更加便捷。【应急保障】雨季库区水位变化时，桥梁为两岸群众提供稳定陆路通道，便于防汛疏散与救援车辆通行。",
+        image: "https://www.kunming.cn/news/upload/resources/image/2025/09/26/1970340_2048x2048.jpeg"
+      },
+      {
+        year: 2002,
+        actualYear: 2001,
+        name: "六广河大桥",
+        lng: 106.4413,
+        lat: 27.0042,
+        type: "公路大桥",
+        icon: "fa-road",
+        note: "实际于2001年建成通车，编年史中标注为2002年以便时间轴分布。",
+        desc: "六广河大桥位于贵阳市修文县与黔西市交界处，跨越六广河峡谷，是贵毕公路上的控制性工程。桥址峡谷深切、地形险峻，建设时期代表了贵州山区跨河桥梁在勘察设计、高墩大跨方面的技术积累。通车后显著缩短了贵阳北部与毕节方向的行车时间，对促进黔西北资源开发与物流畅通具有重要作用。",
+        popupDesc: "【通勤省时】贵阳北部居民前往修文、黔西、毕节方向，行车时间较建桥前大幅缩短，日常上班、探亲更为方便。【物流畅通】沿线蔬菜、煤炭、建材等物资可经大桥快速外运，降低运输成本，惠及农户与小微商户。【山区惠民】峡谷两岸乡镇学生上学、老人看病不必再翻山涉水，客车、救护车均可直达。",
+        image: "https://www.ctnews.com.cn/dcgz2023/pic/2023-06/20/143722_12bea5c2-4f3e-4a7e-926f-1695204d393b.jpeg"
+      },
+      {
+        year: 2004,
+        actualYear: 2004,
+        name: "马岭河大桥",
+        lng: 104.9576,
+        lat: 25.1595,
+        type: "峡谷公路桥",
+        icon: "fa-mountain",
+        note: "",
+        desc: "马岭河大桥横跨兴义马岭河峡谷，与著名的马岭河漂流、峡谷奇观相邻。峡谷纵深、地质复杂，桥梁建设需克服高边坡与强风化岩体等难题。作为黔西南旅游干线的关键节点，它使兴义与周边景区、省际通道高效衔接，展现了贵州在生态旅游与交通基础设施协同布局方面的实践。",
+        popupDesc: "【旅游惠民】国内外游客前往马岭河峡谷漂流、万峰林景区可经大桥快速抵达，带动沿线民宿、餐饮就业。【农特外销】兴义周边芒果、薏仁米等特产经大桥运往省内外的市场，农民增收渠道更宽。【应急救助】峡谷地质灾害或交通事故时，消防、医疗车辆可迅速跨谷救援，保障群众生命安全。",
+        image: "https://bkimg.cdn.bcebos.com/pic/cc11728b4710b912c8fc480ae7b7eb039245d78884a7?x-bce-process=image/format,f_auto/watermark,image_d2F0ZXIvYmFpa2UyNzI,g_7,xp_5,yp_5,P_20/resize,m_lfit,limit_1,h_1080"
+      },
+      {
+        year: 2006,
+        actualYear: 2005,
+        name: "清水河大桥（早期通道）",
+        lng: 104.881,
+        lat: 25.29,
+        type: "山区公路桥",
+        icon: "fa-bridge",
+        note: "区域通道于2005年前后陆续建成，2006年纳入省级路网重点展示节点。",
+        desc: "清水河大桥位于黔西南州兴义市清水河镇一带，跨越北盘江支流清水河。这一带峰林密布、河面狭窄却岸坡陡峭，桥梁是打通乡镇与国道、省道网的咽喉。早期清水河通道的建设，为后来更高等级的清水河特大桥（2015）积累了水文地质与施工组织经验，体现了贵州桥梁建设由“能通”到“快通”的演进路径。",
+        popupDesc: "【乡村联通】清水河两岸布依族、苗族村寨与兴义城区、国道干线相连，村民赶集、务工不再受河水阻隔。【学生上学】镇中学、完小学生跨河通学有了固定班车线路，雨天也能安全到校。【医疗送达】乡镇卫生院与县级医院之间急救车辆可直通，危急产妇、外伤患者争取救治时间。",
+        image: "https://k.sinaimg.cn/n/sinakd20201114ac/40/w480h360/20201114/17c5-kcunqze8187837.jpg/w700d1q75cms.jpg?by=cms_fixed_width"
+      },
+      {
+        year: 2008,
+        actualYear: 2008,
+        name: "鸭池河大桥",
+        lng: 106.1480,
+        lat: 26.8517,
+        type: "铁路公路两用区域桥",
+        icon: "fa-train",
+        note: "",
+        desc: "鸭池河大桥位于毕节与贵阳交界地带，跨越鸭池河水库峡谷，是贵黔、厦蓉等通道上的著名地标。桥区水域开阔、两岸山体高大，建设期面临深水基础与高空作业等挑战。大桥建成后强化了贵阳城市圈与毕节乌蒙山区的联系，对煤炭、清洁能源外运及民族地区乡村振兴具有长期支撑意义，也是摄影爱好者镜头中的“高峡平湖”经典构图。",
+        popupDesc: "【务工返乡】在贵阳、毕节务工的山区群众春节、节假日回家，经大桥少走数十公里盘山路。【能源保供】黔西北煤电、风电等能源物资经大桥外送，保障全省生产生活用电用煤需求。【山货进城】乌蒙山区土豆、荞麦、核桃等农货直达城市批发市场，减少中间环节，让利农户。",
+        image: "https://p9.itc.cn/q_70/images03/20220902/70f0cff18f214a088392b4a23f5360c4.jpeg"
+      },
+      {
+        year: 2010,
+        actualYear: 2009,
+        name: "坝陵河大桥",
+        lng: 105.6424,
+        lat: 25.9646,
+        type: "钢桁梁悬索桥",
+        icon: "fa-bridge-water",
+        note: "大桥于2009年12月通车，时间轴标注2010年代表进入“大桥时代”的节点。",
+        desc: "坝陵河大桥位于安顺市关岭县，是上海—昆明高速公路上的标志性工程，主跨达1088米，曾创多项国内纪录。桥下坝陵河峡谷深度惊人，桥梁与黄果树、关岭地质公园形成旅游黄金线。其建设标志着贵州由传统山区小桥向世界级峡谷悬索桥迈进，带动了桥旅融合、极限运动等新业态，是“桥见贵州”的名片之一。",
+        popupDesc: "【跨省出行】云南、贵州两省群众经沪昆高速过桥，昆明至贵阳车程显著压缩，商务、探亲更加便捷。【旅游集散】前往黄果树瀑布、关岭化石群、坝陵河大桥景区的游客经大桥分流，带动关岭餐饮、住宿、特产销售。【货运增效】长途货车不必再绕山区旧路，生鲜、工业品运输时效提高，物流成本下降惠及消费者。",
+        image: "https://rs-channel.huanqiucdn.cn/imageDir/81c36eb88c158da8d5d09c3ac973744fu5.jpg"
+      },
+      {
+        year: 2012,
+        actualYear: 2012,
+        name: "花鱼洞大桥",
+        lng: 106.4412,
+        lat: 26.5361,
+        type: "库区公路桥",
+        icon: "fa-fish",
+        note: "",
+        desc: "花鱼洞大桥坐落于贵阳花溪水库（花鱼洞水库）库区，连接花溪与青岩方向旅游路网。库区桥型需兼顾水位变幅、泄洪与景观协调，是贵州典型的“库区内架桥”案例。桥梁改善了花溪国家城市湿地公园与青岩古镇等景区的通达性，对贵阳南部生态旅游圈的形成具有基础支撑作用，也体现了桥梁与水资源、生态文明建设的协同理念。",
+        popupDesc: "【周末休闲】贵阳市民前往花溪湿地公园、青岩古镇、天河潭等景区，经大桥避开拥堵旧线，亲子出游更轻松。【生态护水】桥梁建设兼顾水库泄洪与水质保护，减少车辆绕库区土路行驶对水源的扬尘污染。【村镇受益】库区周边村民进城就业、采购农资有稳定公路，不再受水位季节影响断行。",
+        image: "https://k.sinaimg.cn/n/sinakd20112/192/w1024h768/20220723/a6a1-cd368ae63a5162ae649af6a67ee92a4c.jpg/w700d1q75cms.jpg?by=cms_fixed_width"
+      },
+      {
+        year: 2014,
+        actualYear: 2013,
+        name: "北盘江大桥（沪昆高铁）",
+        lng: 105.2608,
+        lat: 25.9514,
+        type: "高速铁路拱桥",
+        icon: "fa-train-subway",
+        note: "2013年合龙、2014年联调，编年史取2014年代表高铁拱桥技术突破。",
+        desc: "沪昆高铁北盘江特大桥位于六盘水市水城区与晴隆交界，是世界最大跨度铁路钢筋混凝土拱桥之一，主跨445米。桥址地处云贵高原深切割峡谷，风场、温差与地震作用显著，设计施工难度极高。它的建成使沪昆高铁贵州西段实现高标贯通，大幅压缩西南与华东的时空距离，象征贵州从“慢火车”迈入“高铁时代”的里程碑。",
+        popupDesc: "【大众快行】沿线百姓乘坐高铁前往长沙、上海、杭州等地，朝发夕至，打工、求学、旅游选择更多。【票价普惠】高铁开行后形成多样化车次，学生票、团体票等政策惠及普通家庭。【区域带动】六盘水、安顺等地农产品、旅游宣传随高铁走向全国，车站周边餐饮、住宿、快递等服务业吸纳本地就业。",
+        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Qinglong_Railway_Bridge1.JPG/960px-Qinglong_Railway_Bridge1.JPG"
+      },
+      {
+        year: 2016,
+        actualYear: 2016,
+        name: "北盘江第一桥（杭瑞高速）",
+        lng: 104.6832,
+        lat: 26.3879,
+        type: "山区悬索桥",
+        icon: "fa-road-bridge",
+        note: "",
+        desc: "杭瑞高速北盘江大桥（俗称北盘江第一桥）桥面至谷底垂直高度曾居世界第一，连接云南宣威与贵州水城。桥梁采用双塔四跨悬索桥方案，适应极端峡谷风环境。通车后成为东西向省际通道的战略节点，与相邻铁路拱桥、水电站库区共同构成壮观的“桥梁博物馆”景观带，彰显贵州在超高大跨桥梁领域的系统创新能力。",
+        popupDesc: "【省际互通】云南宣威、贵州水城两地群众走亲、经商经大桥一日往返，不再翻越大山。【货车司机】长途货运司机节省油耗与时间，生活成本降低，家庭团聚时间增多。【民生保障】冬季凝冻、汛期洪水时，大桥保障基本通行能力，应急物资、生活必需品可及时运抵山区。",
+        image: "https://newbbs-fd.zol-img.com.cn/t_s1200x5000/g5/M00/0C/0B/ChMkJ1j0u8GISWvfABAoCQo5iL0AAbu-ABJVrcAECgh121.jpg"
+      },
+      {
+        year: 2018,
+        actualYear: 2018,
+        name: "金烽乌江大桥",
+        lng: 106.4815,
+        lat: 27.1995,
+        type: "公路斜拉桥",
+        icon: "fa-tower-broadcast",
+        note: "",
+        desc: "金烽乌江大桥位于贵阳市观山湖区金烽村，跨越乌江支流，是贵阳城市快速路网的重要组成部分。桥梁采用现代斜拉桥造型，与城市发展、滨江景观相融合。其建设缓解了老城区的过江交通压力，支撑了观山湖金融城、物流园等产业布局，是“桥建城兴”在省会都市圈中的典型样本，也反映了贵州桥梁从深山峡谷走向城市滨江的时代变迁。",
+        popupDesc: "【日常通勤】观山湖、白云、清镇等地居民跨江上班，早晚高峰过桥时间可控，减少绕路拥堵。【急救绿色】救护车、消防车经大桥快速抵达江两岸社区，争取抢救黄金时间。【产业便民】金融城、物流园货物配送、快递外卖跨江送达更高效，小微企业运营成本降低，市民网购收货更快。",
+        image: "https://www.highestbridges.com/wiki/images/c/cd/JinfengWujiangSideCompleted.jpg"
+      },
+      {
+        year: 2020,
+        actualYear: 2019,
+        name: "平塘特大桥",
+        lng: 107.0700,
+        lat: 25.7888,
+        type: "三塔斜拉桥",
+        icon: "fa-star",
+        note: "2019年9月通车，时间轴标注2020年象征“天空之桥”旅游品牌成熟。",
+        desc: "平塘特大桥是平塘至罗甸高速公路的控制性工程，为三塔双索面斜拉桥，桥塔高达328米，被誉为“天空之桥”。它坐落于喀斯特峰丛之间，与平塘“中国天眼”科普旅游形成联动，成为贵州桥旅融合的世界级网红地标。大桥建设推动了黔南深度贫困县的对外联通，展示了交通扶贫与科技旅游、生态文明协同发展的“贵州样本”。",
+        popupDesc: "【脱贫通路】平塘、罗甸等县群众外出务工、销售油茶、百香果等特产，经大桥融入全国高速网，告别“出山难”。【科普旅游】游客前往“中国天眼”、天空之桥观景台，带动沿线村民开农家乐、当导游，家门口增收。【校车安全】山区孩子乘校车过桥上学，不再走悬崖便道，家长更放心。",
+        image: "https://k.sinaimg.cn/n/sinakd10120/603/w831h572/20220119/6c76-cf01e7f21c74720c10a1506606df2c1e.png/w700d1q75cms.jpg?by=cms_fixed_width"
+      },
+      {
+        year: 2022,
+        actualYear: 2021,
+        name: "清水河特大桥",
+        lng: 107.2012,
+        lat: 27.0326,
+        type: "山区斜拉桥",
+        icon: "fa-bridge-circle-check",
+        note: "2021年通车，编年史标注2022年展示黔西南通道升级成果。",
+        desc: "兴义清水河特大桥是兴义环城高速上的关键工程，主跨达1130米级，在黔西南复杂地质条件下实现高塔大跨跨越。与早期清水河通道相比，特大桥显著提升了兴义市作为黔西南中心城市的枢纽功能，促进兴义—安龙—贞丰产业带一体化。其建设体现了贵州桥梁建设由满足连通到服务城市群、产业园区高质量发展的战略升级。",
+        popupDesc: "【环城便民】兴义城区与义龙新区、机场、高铁站之间形成快速环线，市民看病、接站、送货不必穿城堵点。【产业就业】安龙、贞丰产业园与兴义主城人员、物资往来更密，本地劳动力就近就业增多。【应急联动】火灾、交通事故时，跨江消防、交警经特大桥迅速支援，减少二次伤害。",
+        image: "https://k.sinaimg.cn/n/sinakd20201114ac/40/w480h360/20201114/17c5-kcunqze8187837.jpg/w700d1q75cms.jpg?by=cms_fixed_width"
+      },
+      {
+        year: 2025,
+        actualYear: 2024,
+        name: "花江峡谷大桥",
+        lng: 105.5972,
+        lat: 25.7075,
+        type: "在建/续建特大桥群",
+        icon: "fa-rocket",
+        note: "代表2024—2025年贵州续建高速通道中的新一代峡谷桥梁，具体通车以官方为准。",
+        desc: "随着贵州高速公路网向“十四五”收官迈进，北盘江、乌江、赤水河等流域一批特大桥梁续建通车，六枝至安龙等高速公路上的跨江大桥群正在刷新山区桥梁的建设速度与规模纪录。这些工程继续巩固贵州作为西南陆海新通道重要枢纽的地位，支撑新型工业化、农业现代化与旅游产业化。它们承继坝陵河、平塘的精神，向着更智能、更绿色、更安全的桥梁强国目标迈进，书写“黔桥”新篇章。",
+        popupDesc: "【未来出行】通道建成后，六枝、安龙、晴隆等地群众前往贵阳、安顺、兴义方向将更加快捷，山区与坝区联系更紧。【就业预期】建设期吸纳大量本地劳务，通车后物流、旅游服务业岗位增加，青年可在家门口工作。【区域协同】北盘江流域各民族村寨融入高速网，医疗、教育、电商服务随路进村，助力乡村振兴与共同富裕。",
+        image: "https://oss.eyesnews.cn/data/upload/image/2025/09/25/17587654003553.jpg"
+      }
+    ];
+
+    /* ---------- 按年份索引，便于滑块查找最近桥梁 ---------- */
+    const bridgeByYear = {};
+    BRIDGES.forEach((b) => { bridgeByYear[b.year] = b; });
+    const bridgeYears = BRIDGES.map((b) => b.year).sort((a, b) => a - b);
+
+    /* ---------- 全局状态 ---------- */
+    let map = null;
+    let markers = [];
+    let infoWindow = null;
+    let currentBridgeIndex = 0;
+    let mapModeIndex = 0; // 0普通 1卫星 2三维倾斜
+    const mapModes = ["普通", "卫星", "三维"];
+    let playTimer = null;
+    let isPlaying = false;
+    const INITIAL_CENTER = { lng: 106.55, lat: 26.35 };
+    const INITIAL_ZOOM = 8;
+    const TIMELINE_MIN = 2000;
+    const TIMELINE_MAX = 2025;
+
+    /** 将年份映射为时间轴上的百分比位置（0% = 2000，100% = 2025） */
+    function yearToPercent(year) {
+      return ((year - TIMELINE_MIN) / (TIMELINE_MAX - TIMELINE_MIN)) * 100;
+    }
+
+    /**
+     * 根据滑块年份找到对应或最近的桥梁索引
+     */
+    function findBridgeIndexByYear(year) {
+      if (bridgeByYear[year]) {
+        return BRIDGES.findIndex((b) => b.year === year);
+      }
+      let closest = 0;
+      let minDiff = Infinity;
+      BRIDGES.forEach((b, i) => {
+        const d = Math.abs(b.year - year);
+        if (d < minDiff) {
+          minDiff = d;
+          closest = i;
+        }
+      });
+      return closest;
+    }
+
+    /** 生成 SVG 发光标记 Data URL */
+    function getMarkerIconUrl(isActive) {
+      const color = isActive ? "#ff2d95" : "#00f5ff";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r="14" fill="${color}" opacity="0.25"/>
+        <circle cx="16" cy="16" r="10" fill="${color}" opacity="0.5"/>
+        <circle cx="16" cy="16" r="6" fill="${color}" stroke="#fff" stroke-width="2"/>
+      </svg>`;
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.trim());
+    }
+
+    function createMarkerIcon(isActive) {
+      return new BMapGL.Icon(getMarkerIconUrl(isActive), new BMapGL.Size(32, 32), {
+        anchor: new BMapGL.Size(16, 16)
+      });
+    }
+
+    /**
+     * 信息窗口 HTML（科技感样式）
+     */
+    const INFO_WINDOW_WIDTH = 400;
+
+    /**
+     * 地图弹窗（popupDesc：为民服务，与右侧 desc 不同，全文展示）
+     */
+    function buildInfoWindowContent(bridge) {
+      const noteHtml = bridge.note
+        ? `<p class="iw-note">※ ${bridge.note}</p>`
+        : "";
+      return `
+        <div class="custom-infowindow">
+          <span class="iw-tag">${bridge.year} 年 · 为民服务</span>
+          <h4>${bridge.name}</h4>
+          <p class="iw-body">${bridge.popupDesc}</p>
+          ${noteHtml}
+        </div>`;
+    }
+
+    /** 按内容高度自适应弹窗，避免文字被裁切 */
+    function resizeInfoWindow() {
+      if (!infoWindow) return;
+      const el = document.querySelector(".custom-infowindow");
+      if (!el) return;
+      const h = Math.min(Math.max(el.offsetHeight + 24, 120), 520);
+      if (typeof infoWindow.setHeight === "function") infoWindow.setHeight(h);
+      if (typeof infoWindow.setWidth === "function") infoWindow.setWidth(INFO_WINDOW_WIDTH);
+    }
+
+    /**
+     * 更新左侧桥梁图片弹窗
+     */
+    function updateBridgeImagePopup(bridge) {
+      const popup = document.getElementById("bridgeImgPopup");
+      const imgEl = document.getElementById("bridgeImgEl");
+      const loadingEl = document.getElementById("bridgeImgLoading");
+      const bodyEl = document.getElementById("bridgeImgBody");
+
+      document.getElementById("bridgeImgTitle").textContent = bridge.name;
+      document.getElementById("bridgeImgYear").textContent = bridge.year;
+
+      /* 清除上一次加载失败的占位 */
+      const oldErr = bodyEl.querySelector(".bridge-img-popup-error");
+      if (oldErr) oldErr.remove();
+
+      if (!bridge.image) {
+        popup.classList.remove("visible");
+        return;
+      }
+
+      loadingEl.style.display = "flex";
+      loadingEl.textContent = "图片加载中…";
+      imgEl.style.display = "none";
+      imgEl.alt = bridge.name + " 实景图";
+
+      imgEl.onload = function () {
+        loadingEl.style.display = "none";
+        imgEl.style.display = "block";
+      };
+
+      imgEl.onerror = function () {
+        imgEl.style.display = "none";
+        loadingEl.style.display = "none";
+        if (!bodyEl.querySelector(".bridge-img-popup-error")) {
+          const err = document.createElement("div");
+          err.className = "bridge-img-popup-error";
+          err.textContent = "图片暂时无法加载";
+          bodyEl.appendChild(err);
+        }
+      };
+
+      imgEl.src = bridge.image;
+      popup.classList.add("visible");
+    }
+
+    /** 隐藏左侧图片弹窗（重置地图时） */
+    function hideBridgeImagePopup() {
+      document.getElementById("bridgeImgPopup").classList.remove("visible");
+    }
+
+    /**
+     * 更新右侧面板
+     */
+    function updateInfoPanel(bridge, highlight) {
+      const panel = document.getElementById("infoPanel");
+      document.getElementById("displayYear").textContent =
+        bridge.year + " 年" + (bridge.actualYear !== bridge.year ? `（实际 ${bridge.actualYear} 年）` : "");
+      document.getElementById("displayName").textContent = bridge.name;
+      document.getElementById("displayMeta").textContent =
+        `${bridge.type} · 东经 ${bridge.lng.toFixed(3)}° 北纬 ${bridge.lat.toFixed(3)}°`;
+      document.getElementById("displayDesc").textContent = bridge.desc + (bridge.note ? "\n\n【说明】" + bridge.note : "");
+      document.getElementById("bridgeYearShort").textContent =
+        String(bridge.year % 100).padStart(2, "0");
+      panel.classList.toggle("highlight", !!highlight);
+    }
+
+    /**
+     * 聚焦到指定桥梁：飞行动画、打开信息窗、更新标记样式
+     */
+    function focusBridge(index, options = {}) {
+      const { animate = true, highlight = true } = options;
+      if (index < 0 || index >= BRIDGES.length) return;
+      currentBridgeIndex = index;
+      const bridge = BRIDGES[index];
+
+      const point = new BMapGL.Point(bridge.lng, bridge.lat);
+      if (typeof map.flyTo === "function") {
+        map.flyTo(point, 14, { duration: animate ? 1200 : 0 });
+      } else {
+        map.centerAndZoom(point, 14);
+      }
+
+      markers.forEach((m, i) => {
+        m.setIcon(createMarkerIcon(i === index));
+        if (i === index && typeof m.setAnimation === "function") {
+          m.setAnimation(BMAP_ANIMATION_BOUNCE);
+          setTimeout(() => m.setAnimation(null), 1500);
+        }
+      });
+
+      infoWindow.setContent(buildInfoWindowContent(bridge));
+      map.openInfoWindow(infoWindow, point);
+      setTimeout(resizeInfoWindow, 50);
+
+      updateInfoPanel(bridge, highlight);
+      updateBridgeImagePopup(bridge);
+
+      document.getElementById("yearSlider").value = bridge.year;
+      document.getElementById("sliderYearText").textContent = bridge.year + " 年";
+      document.querySelectorAll(".year-tick").forEach((el) => {
+        el.classList.toggle("active", parseInt(el.dataset.year, 10) === bridge.year);
+      });
+    }
+
+    /**
+     * 初始化所有标记点
+     */
+    function initMarkers() {
+      markers = BRIDGES.map((bridge, i) => {
+        const point = new BMapGL.Point(bridge.lng, bridge.lat);
+        const marker = new BMapGL.Marker(point, { icon: createMarkerIcon(i === 0) });
+        marker.addEventListener("click", () => focusBridge(i));
+        map.addOverlay(marker);
+        return marker;
+      });
+    }
+
+    /**
+     * 初始化时间轴刻度按钮（仅有桥梁的年份）
+     */
+    function initYearTicks() {
+      const container = document.getElementById("yearTicks");
+      bridgeYears.forEach((y) => {
+        const btn = document.createElement("button");
+        btn.className = "year-tick" + (y === 2000 ? " active" : "");
+        btn.dataset.year = y;
+        btn.textContent = y;
+        btn.type = "button";
+        btn.style.left = yearToPercent(y) + "%";
+        btn.title = y + " 年";
+        btn.addEventListener("click", () => {
+          const idx = BRIDGES.findIndex((b) => b.year === y);
+          focusBridge(idx);
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    /**
+     * 鼠标在地图上移动时，顶部实时显示经纬度
+     */
+    function initMapCoordTracker() {
+      const coordText = document.getElementById("mapCoordText");
+      const mapEl = document.getElementById("mapContainer");
+      const emptyLabel = "经度 —°　纬度 —°";
+
+      function showCoord(lng, lat) {
+        coordText.textContent =
+          "经度 " + lng.toFixed(6) + "°　纬度 " + lat.toFixed(6) + "°";
+      }
+
+      function updateFromPixel(x, y) {
+        if (!map || typeof map.pixelToPoint !== "function") return;
+        const point = map.pixelToPoint(new BMapGL.Pixel(x, y));
+        if (point && point.lng != null && point.lat != null) {
+          showCoord(point.lng, point.lat);
+        }
+      }
+
+      mapEl.addEventListener("mousemove", (ev) => {
+        const rect = mapEl.getBoundingClientRect();
+        updateFromPixel(ev.clientX - rect.left, ev.clientY - rect.top);
+      });
+
+      mapEl.addEventListener("mouseleave", () => {
+        coordText.textContent = emptyLabel;
+      });
+
+      if (typeof map.addEventListener === "function") {
+        map.addEventListener("mousemove", (e) => {
+          const ll = e.latlng || e.latLng || e.point;
+          if (ll && ll.lng != null && ll.lat != null) {
+            showCoord(ll.lng, ll.lat);
+          }
+        });
+      }
+    }
+
+    /**
+     * 初始化百度地图
+     */
+    function initMap() {
+      map = new BMapGL.Map("mapContainer");
+      const center = new BMapGL.Point(INITIAL_CENTER.lng, INITIAL_CENTER.lat);
+      map.centerAndZoom(center, INITIAL_ZOOM);
+      map.enableScrollWheelZoom(true);
+      map.setTilt(0);
+      map.setHeading(0);
+
+      infoWindow = new BMapGL.InfoWindow("", {
+        width: INFO_WINDOW_WIDTH,
+        height: 200,
+        title: "",
+        enableAutoPan: true
+      });
+
+      initMarkers();
+      initYearTicks();
+      initMapCoordTracker();
+
+      document.getElementById("loadingOverlay").classList.add("hidden");
+      document.getElementById("mapFrame").classList.add("loaded");
+
+      focusBridge(0, { animate: false, highlight: false });
+    }
+
+    /**
+     * 重置地图到贵州省初始视角
+     */
+    function resetMap() {
+      stopPlay();
+      const center = new BMapGL.Point(INITIAL_CENTER.lng, INITIAL_CENTER.lat);
+      if (typeof map.flyTo === "function") {
+        map.flyTo(center, INITIAL_ZOOM, { duration: 1000 });
+      } else {
+        map.centerAndZoom(center, INITIAL_ZOOM);
+      }
+      map.setTilt(0);
+      map.setHeading(0);
+      map.closeInfoWindow();
+      hideBridgeImagePopup();
+      markers.forEach((m) => m.setAnimation(null));
+      document.getElementById("infoPanel").classList.remove("highlight");
+    }
+
+    /**
+     * 切换地图模式：普通 / 卫星 / 三维倾斜
+     */
+    function toggleMapMode() {
+      mapModeIndex = (mapModeIndex + 1) % 3;
+      document.getElementById("mapModeLabel").textContent = "模式：" + mapModes[mapModeIndex];
+
+      if (mapModeIndex === 0) {
+        map.setMapType(BMAP_NORMAL_MAP);
+        map.setTilt(0);
+      } else if (mapModeIndex === 1) {
+        map.setMapType(BMAP_SATELLITE_MAP);
+        map.setTilt(0);
+      } else {
+        map.setMapType(BMAP_SATELLITE_MAP);
+        map.setTilt(55);
+        map.setHeading(15);
+      }
+    }
+
+    /**
+     * 自动播放：按桥梁年份顺序逐年跳转
+     */
+    function togglePlay() {
+      if (isPlaying) {
+        stopPlay();
+        return;
+      }
+      isPlaying = true;
+      document.getElementById("btnPlay").classList.add("active");
+      document.getElementById("btnPlay").innerHTML = '<i class="fas fa-pause"></i> 暂停';
+
+      let idx = currentBridgeIndex;
+      playTimer = setInterval(() => {
+        idx = (idx + 1) % BRIDGES.length;
+        focusBridge(idx);
+        if (idx === BRIDGES.length - 1) {
+          /* 播放到最后一座后下一轮继续循环 */
+        }
+      }, 3500);
+    }
+
+    function stopPlay() {
+      isPlaying = false;
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
+      }
+      document.getElementById("btnPlay").classList.remove("active");
+      document.getElementById("btnPlay").innerHTML = '<i class="fas fa-play"></i> 播放动画';
+    }
+
+    /* ---------- 事件绑定 ---------- */
+    document.getElementById("yearSlider").addEventListener("input", (e) => {
+      const year = parseInt(e.target.value, 10);
+      document.getElementById("sliderYearText").textContent = year + " 年";
+      const idx = findBridgeIndexByYear(year);
+      if (BRIDGES[idx].year === year) {
+        focusBridge(idx);
+      }
+    });
+
+    document.getElementById("yearSlider").addEventListener("change", (e) => {
+      const year = parseInt(e.target.value, 10);
+      const idx = findBridgeIndexByYear(year);
+      focusBridge(idx);
+    });
+
+    document.getElementById("btnPlay").addEventListener("click", togglePlay);
+    document.getElementById("btnReset").addEventListener("click", resetMap);
+    document.getElementById("btnMapMode").addEventListener("click", toggleMapMode);
+
+    /* 地图 API 加载完成后初始化 */
+    function waitForBMap() {
+      if (typeof BMapGL !== "undefined") {
+        initMap();
+      } else {
+        setTimeout(waitForBMap, 100);
+      }
+    }
+
+    window.onload = function () {
+      document.getElementById("akHint").textContent =
+        "小编提醒大家，网页内容可能与现实有所出入，请大家以官方为准！";
+      waitForBMap();
+    };
+  </script>
+</body>
+</html>
