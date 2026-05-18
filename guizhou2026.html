@@ -336,7 +336,8 @@
       var CONNECT_TOLERANCE_M = 25;
       var MIN_SEARCH_BUFFER_M = 2000;
       var QUERY_PAGE_SIZE = 2000;
-      var GRAPH_CHUNK_SIZE = 120;
+      var GRAPH_CHUNK_SIZE = 500;
+      var EDGE_KEY_MULT = 10000000;
       var snapSearchRadiusM = 1000;
       var START_NODE_ID = 0;
       var END_NODE_ID = 1;
@@ -394,6 +395,7 @@
       var endSnapInfo = null;
       var isRouting = false;
       var isSnapping = false;
+      var roadNetCache = { key: "", graph: null, nodeIndex: null };
 
       var startSymbol = {
         type: "simple-marker",
@@ -640,13 +642,19 @@
       };
 
       MinHeap.prototype.pop = function () {
-        var top = this.heap[0];
-        var last = this.heap.pop();
-        if (this.heap.length) {
-          this.heap[0] = last;
+        var heap = this.heap;
+        if (!heap.length) return undefined;
+        var top = heap[0];
+        var last = heap.pop();
+        if (heap.length) {
+          heap[0] = last;
           this._sinkDown(0);
         }
         return top;
+      };
+
+      MinHeap.prototype.size = function () {
+        return this.heap.length;
       };
 
       MinHeap.prototype._bubbleUp = function (i) {
@@ -678,59 +686,75 @@
         }
       };
 
-      function addEdge(graph, from, to, weight, meta) {
-        if (!graph[from]) graph[from] = [];
-        var edges = graph[from];
-        for (var i = 0; i < edges.length; i++) {
-          if (edges[i].node === to) {
-            if (weight < edges[i].weight) {
-              edges[i].weight = weight;
-              edges[i].meta = meta || {};
-            }
-            return;
-          }
-        }
-        edges.push({ node: to, weight: weight, meta: meta || {} });
+      function edgeKey(from, to) {
+        return from * EDGE_KEY_MULT + to;
       }
 
-      function addSegmentToGraph(graph, nodeIndex, ax, ay, bx, by, meta) {
+      function addEdgeToMap(edgeMap, from, to, weight, meta) {
+        var k = edgeKey(from, to);
+        var cur = edgeMap[k];
+        if (!cur || weight < cur.weight) {
+          edgeMap[k] = { weight: weight, meta: meta || {} };
+        }
+      }
+
+      function addSegmentToEdgeMap(edgeMap, nodeIndex, ax, ay, bx, by, meta) {
         var aId = nodeIndex.getId(ax, ay);
         var bId = nodeIndex.getId(bx, by);
         var w = fastDist(ax, ay, bx, by);
         if (w <= 0) return;
-        addEdge(graph, aId, bId, w, meta);
-        addEdge(graph, bId, aId, w, meta);
+        addEdgeToMap(edgeMap, aId, bId, w, meta);
+        addEdgeToMap(edgeMap, bId, aId, w, meta);
       }
 
-      function ensureBidirectionalGraph(graph) {
+      function compileEdgeMap(edgeMap) {
+        var graph = {};
+        for (var k in edgeMap) {
+          if (!Object.prototype.hasOwnProperty.call(edgeMap, k)) continue;
+          var key = Number(k);
+          var from = Math.floor(key / EDGE_KEY_MULT);
+          var to = key % EDGE_KEY_MULT;
+          var e = edgeMap[k];
+          if (!graph[from]) graph[from] = [];
+          graph[from].push({ node: to, weight: e.weight, meta: e.meta });
+        }
+        return graph;
+      }
+
+      function cloneGraph(graph) {
+        var copy = {};
         var keys = Object.keys(graph);
-        for (var k = 0; k < keys.length; k++) {
-          var from = Number(keys[k]);
-          var edges = graph[from];
-          if (!edges) continue;
-          for (var i = 0; i < edges.length; i++) {
-            var e = edges[i];
-            var to = e.node;
-            var w = e.weight;
-            var meta = e.meta;
-            if (!graph[to]) graph[to] = [];
-            var rev = graph[to];
-            var found = false;
-            for (var j = 0; j < rev.length; j++) {
-              if (rev[j].node === from) {
-                found = true;
-                if (w < rev[j].weight) rev[j].weight = w;
-                break;
-              }
-            }
-            if (!found) {
-              rev.push({ node: from, weight: w, meta: meta });
-            }
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          copy[k] = graph[k].slice();
+        }
+        return copy;
+      }
+
+      function cloneNodeIndex(src) {
+        var ni = Object.create(NodeIndex.prototype);
+        ni.tolerance = src.tolerance;
+        ni.tol2 = src.tol2;
+        ni.cellSize = src.cellSize;
+        ni.nextId = src.nextId;
+        ni.nodes = src.nodes.slice();
+        ni.grid = {};
+        for (var key in src.grid) {
+          if (Object.prototype.hasOwnProperty.call(src.grid, key)) {
+            ni.grid[key] = src.grid[key].slice();
           }
         }
+        return ni;
       }
 
-      function processFeatureIntoGraph(feature, graph, nodeIndex) {
+      function extentCacheKey(extent) {
+        if (!extent) return "";
+        return [
+          extent.xmin, extent.ymin, extent.xmax, extent.ymax
+        ].map(function (v) { return Math.round(v); }).join("|");
+      }
+
+      function processFeatureIntoEdgeMap(feature, edgeMap, nodeIndex) {
         var geom = feature.geometry;
         if (!geom || !geom.paths) return;
         var meta = { feature: feature };
@@ -738,8 +762,8 @@
         for (var p = 0; p < geom.paths.length; p++) {
           var path = geom.paths[p];
           for (var i = 0; i < path.length - 1; i++) {
-            addSegmentToGraph(
-              graph, nodeIndex,
+            addSegmentToEdgeMap(
+              edgeMap, nodeIndex,
               path[i][0], path[i][1],
               path[i + 1][0], path[i + 1][1],
               meta
@@ -748,8 +772,15 @@
         }
       }
 
-      function buildGraphAsync(features) {
-        var graph = {};
+      function buildGraphAsync(features, cacheKey) {
+        if (cacheKey && roadNetCache.key === cacheKey && roadNetCache.graph) {
+          return Promise.resolve({
+            graph: cloneGraph(roadNetCache.graph),
+            nodeIndex: cloneNodeIndex(roadNetCache.nodeIndex)
+          });
+        }
+
+        var edgeMap = {};
         var nodeIndex = new NodeIndex(CONNECT_TOLERANCE_M);
         var idx = 0;
 
@@ -757,12 +788,17 @@
           function step() {
             var end = Math.min(idx + GRAPH_CHUNK_SIZE, features.length);
             for (; idx < end; idx++) {
-              processFeatureIntoGraph(features[idx], graph, nodeIndex);
+              processFeatureIntoEdgeMap(features[idx], edgeMap, nodeIndex);
             }
             if (idx < features.length) {
               setTimeout(step, 0);
             } else {
-              ensureBidirectionalGraph(graph);
+              var graph = compileEdgeMap(edgeMap);
+              if (cacheKey) {
+                roadNetCache.key = cacheKey;
+                roadNetCache.graph = cloneGraph(graph);
+                roadNetCache.nodeIndex = cloneNodeIndex(nodeIndex);
+              }
               resolve({ graph: graph, nodeIndex: nodeIndex });
             }
           }
@@ -805,68 +841,77 @@
         return best;
       }
 
-      function insertSnapOnGraph(graph, nodeIndex, snap) {
-        var sx = snap.coordinate.x;
-        var sy = snap.coordinate.y;
-        var snapId = nodeIndex.getId(sx, sy);
-        var aId = nodeIndex.getId(snap.a[0], snap.a[1]);
-        var bId = nodeIndex.getId(snap.b[0], snap.b[1]);
-        var lenA = fastDist(sx, sy, snap.a[0], snap.a[1]);
-        var lenB = fastDist(sx, sy, snap.b[0], snap.b[1]);
-        var meta = { feature: snap.feature };
-
-        addEdge(graph, snapId, aId, lenA, meta);
-        addEdge(graph, aId, snapId, lenA, meta);
-        addEdge(graph, snapId, bId, lenB, meta);
-        addEdge(graph, bId, snapId, lenB, meta);
-        return snapId;
+      function pushEdge(graph, from, to, weight, meta) {
+        if (!graph[from]) graph[from] = [];
+        graph[from].push({ node: to, weight: weight, meta: meta || {} });
       }
 
-      function connectVirtualNode(graph, nodeIndex, virtualId, clickPoint, snapInfo) {
+      function connectSnapEndpoint(graph, nodeIndex, snapInfo) {
         if (!snapInfo || !snapInfo.coordinate) return null;
-        var snapId = insertSnapOnGraph(graph, nodeIndex, snapInfo);
-        var distClickToSnap = fastDist(
-          clickPoint.x, clickPoint.y,
-          snapInfo.coordinate.x, snapInfo.coordinate.y
-        );
-        addEdge(graph, virtualId, snapId, distClickToSnap, { virtual: true });
-        addEdge(graph, snapId, virtualId, distClickToSnap, { virtual: true });
-        if (!graph[virtualId]) graph[virtualId] = [];
+        var sx = snapInfo.coordinate.x;
+        var sy = snapInfo.coordinate.y;
+        var snapId = nodeIndex.getId(sx, sy);
+        var aId = nodeIndex.getId(snapInfo.a[0], snapInfo.a[1]);
+        var bId = nodeIndex.getId(snapInfo.b[0], snapInfo.b[1]);
+        var lenA = fastDist(sx, sy, snapInfo.a[0], snapInfo.a[1]);
+        var lenB = fastDist(sx, sy, snapInfo.b[0], snapInfo.b[1]);
+        var meta = { feature: snapInfo.feature };
+
+        pushEdge(graph, snapId, aId, lenA, meta);
+        pushEdge(graph, aId, snapId, lenA, meta);
+        pushEdge(graph, snapId, bId, lenB, meta);
+        pushEdge(graph, bId, snapId, lenB, meta);
         return snapId;
       }
 
-      function dijkstra(graph, startId, endId) {
-        var dist = [];
-        var prev = [];
-        var visited = [];
-        var heap = new MinHeap();
-        dist[startId] = 0;
-        heap.push({ id: startId, dist: 0 });
+      function astar(graph, nodeIndex, startId, endId) {
+        var endNode = nodeIndex.nodes[endId];
+        if (!endNode) return null;
 
-        while (heap.heap.length) {
+        var maxId = nodeIndex.nextId;
+        var INF = Infinity;
+        var gScore = new Float64Array(maxId);
+        gScore.fill(INF);
+        gScore[startId] = 0;
+
+        var closed = new Uint8Array(maxId);
+        var prev = [];
+        var ex = endNode.x;
+        var ey = endNode.y;
+        var heap = new MinHeap();
+
+        function heuristic(id) {
+          var n = nodeIndex.nodes[id];
+          return n ? fastDist(n.x, n.y, ex, ey) : 0;
+        }
+
+        heap.push({ id: startId, dist: heuristic(startId) });
+
+        while (heap.size()) {
           var cur = heap.pop();
           var u = cur.id;
-          if (visited[u]) continue;
-          visited[u] = true;
+          if (closed[u]) continue;
           if (u === endId) break;
-          if (cur.dist > dist[u]) continue;
+          closed[u] = 1;
 
           var edges = graph[u];
           if (!edges) continue;
+          var gu = gScore[u];
 
           for (var i = 0; i < edges.length; i++) {
             var edge = edges[i];
             var v = edge.node;
-            var alt = dist[u] + edge.weight;
-            if (dist[v] === undefined || alt < dist[v]) {
-              dist[v] = alt;
+            if (closed[v]) continue;
+            var tentative = gu + edge.weight;
+            if (tentative < gScore[v]) {
+              gScore[v] = tentative;
               prev[v] = { node: u, meta: edge.meta };
-              heap.push({ id: v, dist: alt });
+              heap.push({ id: v, dist: tentative + heuristic(v) });
             }
           }
         }
 
-        if (dist[endId] === undefined || !isFinite(dist[endId])) return null;
+        if (!isFinite(gScore[endId])) return null;
 
         var pathIds = [];
         var node = endId;
@@ -878,14 +923,13 @@
           if (!step) break;
           node = step.node;
         }
-        return { ids: pathIds, distance: dist[endId], prev: prev };
+        return { ids: pathIds, distance: gScore[endId], prev: prev };
       }
 
       function buildRoutePolyline(pathIds, nodeIndex, fromPoint, toPoint) {
         var coords = [[fromPoint.x, fromPoint.y]];
         for (var i = 0; i < pathIds.length; i++) {
           var id = pathIds[i];
-          if (id === START_NODE_ID || id === END_NODE_ID) continue;
           var n = nodeIndex.nodes[id];
           if (!n) continue;
           coords.push([n.x, n.y]);
@@ -1055,35 +1099,28 @@
         return names;
       }
 
-      function computeRouteFromFeatures(features) {
-        return buildGraphAsync(features).then(function (net) {
+      function computeRouteFromFeatures(features, cacheKey) {
+        return buildGraphAsync(features, cacheKey).then(function (net) {
           setRouteStatus("道路网已构建，正在计算最短路径…");
           return yieldToUI().then(function () {
             var graph = net.graph;
             var nodeIndex = net.nodeIndex;
-            graph[START_NODE_ID] = graph[START_NODE_ID] || [];
-            graph[END_NODE_ID] = graph[END_NODE_ID] || [];
+            var startId = connectSnapEndpoint(graph, nodeIndex, startSnapInfo);
+            var endId = connectSnapEndpoint(graph, nodeIndex, endSnapInfo);
 
-            if (!connectVirtualNode(graph, nodeIndex, START_NODE_ID, startPoint, startSnapInfo) ||
-                !connectVirtualNode(graph, nodeIndex, END_NODE_ID, endPoint, endSnapInfo)) {
+            if (startId == null || endId == null) {
               return { error: "connect" };
             }
 
-            return yieldToUI().then(function () {
-              return dijkstra(graph, START_NODE_ID, END_NODE_ID);
-            }).then(function (result) {
-              if (!result) return { error: "noPath", featureCount: features.length };
-              var pathIds = result.ids.filter(function (id) {
-                return id !== START_NODE_ID && id !== END_NODE_ID;
-              });
-              if (pathIds.length < 1) return { error: "short" };
-              return {
-                result: result,
-                pathIds: pathIds,
-                nodeIndex: nodeIndex,
-                featureCount: features.length
-              };
-            });
+            var result = astar(graph, nodeIndex, startId, endId);
+            if (!result) return { error: "noPath", featureCount: features.length };
+            if (result.ids.length < 2) return { error: "short" };
+            return {
+              result: result,
+              pathIds: result.ids,
+              nodeIndex: nodeIndex,
+              featureCount: features.length
+            };
           });
         });
       }
@@ -1097,6 +1134,7 @@
         snapBufferLayer.removeAll();
 
         var combinedExtent = getCombinedRouteExtent(startPoint, endPoint);
+        var netCacheKey = extentCacheKey(combinedExtent);
 
         queryRoadsInExtent(combinedExtent).then(function (features) {
           if (!features.length) {
@@ -1104,9 +1142,14 @@
             return;
           }
 
-          setRouteStatus("已加载 " + features.length + " 条道路，正在构建路网（" + CONNECT_TOLERANCE_M + " 米容差）…");
+          var cacheHit = roadNetCache.key === netCacheKey;
+          setRouteStatus(
+            cacheHit
+              ? "已加载 " + features.length + " 条道路，复用缓存路网，正在计算最短路径…"
+              : "已加载 " + features.length + " 条道路，正在构建路网（" + CONNECT_TOLERANCE_M + " 米容差）…"
+          );
 
-          return computeRouteFromFeatures(features);
+          return computeRouteFromFeatures(features, netCacheKey);
         }).then(function (out) {
           if (!out) return;
 
