@@ -1,0 +1,4093 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>第一章 · 被高山折叠的土地 · ArcGIS 故事地图</title>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
+  <style>
+    :root {
+      --bg-deep: #2a3540;
+      --bg-panel: #f4f1eb;
+      --steel: #5c6d7e;
+      --steel-dark: #3d4f5f;
+      --river: #3d7a9b;
+      --river-light: #5a9fc4;
+      --rust: #b85c38;
+      --rust-light: #d4845c;
+      --concrete: #e8e4dc;
+      --accent: #41b7a6;
+      --text: #2c3338;
+      --muted: #5c6570;
+      --header-h: 52px;
+      --panel-w: min(400px, 36vw);
+      --shadow: 0 8px 28px rgba(26, 35, 45, 0.16);
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+      --map-dock-left: 12px;
+      --map-dock-bottom: 12px;
+      --map-dock-width: 200px;
+      --map-dock-overview-h: 180px;
+      --map-dock-tools-h: 40px;
+      --map-dock-gap: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      overflow: hidden;
+      background: var(--bg-deep);
+      color: var(--text);
+    }
+
+    #pageHeader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-h);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: linear-gradient(90deg, var(--steel-dark), var(--steel));
+      color: #fff;
+      border-bottom: 2px solid var(--rust);
+      pointer-events: none;
+    }
+
+    #pageHeader > * { pointer-events: auto; }
+
+    #pageHeader h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    #pageHeader p {
+      font-size: 0.72rem;
+      opacity: 0.88;
+      margin-top: 2px;
+    }
+
+    .header-tools select {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .header-tools select option { color: #222; }
+
+    .header-tools select:disabled {
+      opacity: 0.92;
+      cursor: default;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      padding-top: var(--header-h);
+    }
+
+    #appMain {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+    }
+
+    #mapWrap {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+    }
+
+    #viewDiv {
+      width: 100%;
+      height: 100%;
+    }
+
+    .map-badge {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 120;
+      padding: 6px 16px;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid var(--steel);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--steel-dark);
+      box-shadow: var(--shadow);
+      pointer-events: none;
+      transition: opacity 0.4s var(--ease);
+    }
+
+    .map-badge strong { color: var(--rust); }
+
+    /* 地图正上方：鼠标经纬度 */
+    .map-coord-bar {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 126;
+      max-width: calc(100% - 200px);
+      padding: 6px 14px;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid var(--steel);
+      border-radius: 18px;
+      font-size: 0.74rem;
+      color: var(--steel-dark);
+      box-shadow: var(--shadow);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+    }
+
+    .map-coord-bar .coord-val {
+      color: var(--rust);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 地图左上角：缩放 + 驿道切换 */
+    .map-top-left-dock {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      z-index: 127;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      max-width: min(280px, 42vw);
+    }
+
+    .map-top-left-dock > * {
+      pointer-events: auto;
+    }
+
+    .map-zoom-slot {
+      position: static;
+      pointer-events: auto;
+    }
+
+    .route-mode-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .route-mode-toggle.visible {
+      display: flex;
+    }
+
+    .route-mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--steel-dark);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 4px 14px rgba(26, 35, 45, 0.12);
+      transition: background 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.2s var(--ease);
+    }
+
+    .route-mode-btn:hover {
+      background: #fff;
+      border-color: var(--river);
+      transform: translateY(-1px);
+    }
+
+    .route-mode-btn.active[data-mode="ancient"] {
+      background: rgba(255, 248, 245, 0.98);
+      border-color: var(--rust);
+      box-shadow: 0 0 0 2px rgba(184, 92, 56, 0.25);
+      color: var(--rust);
+    }
+
+    .route-mode-btn.active[data-mode="modern"] {
+      background: rgba(240, 252, 248, 0.98);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(65, 183, 166, 0.35);
+      color: #2a7a6e;
+    }
+
+    .route-compare-panel {
+      position: absolute;
+      right: 12px;
+      bottom: 36px;
+      z-index: 128;
+      max-width: min(320px, 40vw);
+      padding: 12px 14px 12px 12px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      pointer-events: auto;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+    }
+
+    .route-compare-panel.open {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .route-compare-panel.mode-ancient {
+      border-left: 4px solid var(--rust);
+    }
+
+    .route-compare-panel.mode-modern {
+      border-left: 4px solid var(--river);
+    }
+
+    .route-compare-panel h5 {
+      font-size: 0.78rem;
+      color: var(--steel-dark);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .route-compare-panel p {
+      font-size: 0.74rem;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .route-compare-panel .btn-compare-close {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .route-compare-panel .btn-compare-close:hover {
+      background: rgba(92, 109, 126, 0.12);
+      color: var(--text);
+    }
+
+    .map-zoom-slot .esri-zoom {
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(26, 35, 45, 0.14);
+    }
+
+    .map-zoom-slot .esri-widget--button {
+      width: 32px;
+      height: 32px;
+      background: #fff;
+      border: none;
+      border-bottom: 1px solid #d0d6dc;
+    }
+
+    .map-zoom-slot .esri-widget--button:last-child {
+      border-bottom: none;
+    }
+
+    .map-zoom-slot .esri-widget--button:hover {
+      background: var(--river);
+      color: #fff;
+    }
+
+    /* 地图最下方：底图来源声明 */
+    .map-attribution {
+      position: absolute;
+      left: calc(var(--map-dock-width) + var(--map-dock-left) + 16px);
+      right: 12px;
+      bottom: 4px;
+      z-index: 118;
+      text-align: center;
+      font-size: 0.62rem;
+      line-height: 1.4;
+      color: rgba(44, 51, 56, 0.82);
+      background: rgba(244, 241, 235, 0.88);
+      padding: 4px 10px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    #mapWrap .esri-attribution {
+      display: none !important;
+    }
+
+    /* 左下角统一工具区：上鹰眼图，下比例尺 + Home */
+    .map-corner-dock {
+      position: absolute;
+      left: var(--map-dock-left);
+      bottom: var(--map-dock-bottom);
+      z-index: 130;
+      width: var(--map-dock-width);
+      display: flex;
+      flex-direction: column;
+      gap: var(--map-dock-gap);
+      align-items: stretch;
+      pointer-events: none;
+    }
+
+    .overview-map-wrap {
+      width: 100%;
+      height: var(--map-dock-overview-h);
+      display: flex;
+      flex-direction: column;
+      background: rgba(244, 241, 235, 0.92);
+      border: 1px solid rgba(92, 109, 126, 0.5);
+      border-radius: 8px;
+      box-shadow: 0 6px 22px rgba(26, 35, 45, 0.22);
+      overflow: hidden;
+      pointer-events: auto;
+      transform-origin: left bottom;
+      transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease), border-color 0.28s var(--ease);
+    }
+
+    .overview-map-wrap:hover {
+      transform: scale(1.05);
+      border-color: rgba(184, 92, 56, 0.65);
+      box-shadow: 0 10px 28px rgba(26, 35, 45, 0.28);
+    }
+
+    .map-corner-tools {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      min-height: var(--map-dock-tools-h);
+      padding: 6px 10px;
+      background: rgba(244, 241, 235, 0.94);
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(26, 35, 45, 0.14);
+      pointer-events: auto;
+    }
+
+    .map-corner-tool-slot {
+      display: flex;
+      align-items: center;
+      min-height: 28px;
+    }
+
+    #scaleBarSlot {
+      flex: 1;
+      min-width: 0;
+    }
+
+    #homeBtnSlot {
+      flex-shrink: 0;
+    }
+
+    .map-corner-tools .esri-widget {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .map-corner-tools .esri-scale-bar__label {
+      font-size: 0.72rem;
+      color: var(--steel-dark);
+    }
+
+    .map-corner-tools .esri-home .esri-widget--button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid #c5cdd6;
+    }
+
+    .map-corner-tools .esri-home .esri-widget--button:hover {
+      background: var(--river);
+      border-color: var(--river);
+      color: #fff;
+    }
+
+    .overview-map-head {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(90deg, var(--steel-dark), var(--steel));
+      letter-spacing: 0.06em;
+    }
+
+    .overview-map-view {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      pointer-events: none;
+    }
+
+    .overview-map-wrap .esri-ui,
+    .overview-map-wrap .esri-attribution {
+      display: none !important;
+    }
+
+    .overview-map-wrap .esri-view-surface {
+      border-radius: 0 0 7px 7px;
+    }
+
+    /* 地图右侧可拖拽调宽的信息面板 */
+    #mapMorePanel {
+      --more-panel-w: 320px;
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: var(--more-panel-w);
+      min-width: 240px;
+      max-width: calc(100% - 24px);
+      z-index: 140;
+      background: rgba(244, 241, 235, 0.97);
+      border: 1px solid var(--steel);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: row;
+      transform: translateX(calc(100% + 20px));
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.45s var(--ease), opacity 0.45s var(--ease);
+    }
+
+    #mapMorePanel.open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #mapMorePanel.resizing {
+      transition: none;
+      user-select: none;
+    }
+
+    #mapMorePanel .panel-resize-handle {
+      flex-shrink: 0;
+      width: 10px;
+      cursor: ew-resize;
+      background: linear-gradient(90deg, transparent, rgba(92, 109, 126, 0.12));
+      border-radius: 10px 0 0 10px;
+      position: relative;
+      touch-action: none;
+    }
+
+    #mapMorePanel .panel-resize-handle::after {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 48px;
+      border-radius: 2px;
+      background: repeating-linear-gradient(
+        180deg,
+        var(--steel) 0,
+        var(--steel) 4px,
+        transparent 4px,
+        transparent 8px
+      );
+      opacity: 0.55;
+    }
+
+    #mapMorePanel .panel-resize-handle:hover,
+    #mapMorePanel.resizing .panel-resize-handle {
+      background: linear-gradient(90deg, transparent, rgba(184, 92, 56, 0.18));
+    }
+
+    #mapMorePanel .panel-inner {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #mapMorePanel .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: linear-gradient(90deg, var(--steel-dark), var(--steel));
+      color: #fff;
+      border-radius: 0 9px 0 0;
+      flex-shrink: 0;
+    }
+
+    #mapMorePanel .panel-head h3 {
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    #mapMorePanel .btn-close {
+      border: none;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    #mapMorePanel .btn-close:hover { background: var(--rust); }
+
+    #mapMorePanel .panel-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 12px 14px 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--steel) transparent;
+    }
+
+    /* 垂直排列：拖动左侧可横向拉宽面板以容纳更多文字 */
+    .more-v-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .more-section-card {
+      width: 100%;
+      background: #fff;
+      border: 1px solid #d0d6dc;
+      border-radius: 8px;
+      padding: 10px 12px 12px;
+      box-shadow: 0 2px 8px rgba(42, 53, 64, 0.06);
+    }
+
+    .more-section-card .section-title {
+      margin: 0 0 10px;
+      flex-shrink: 0;
+      font-size: 0.8rem;
+    }
+
+    .kv-list {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .kv-row {
+      display: grid;
+      grid-template-columns: minmax(4.8em, 32%) 1fr;
+      gap: 6px 10px;
+      align-items: start;
+      padding: 8px 0;
+      border-bottom: 1px dashed #e4e8ec;
+      font-size: 0.76rem;
+    }
+
+    .kv-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .kv-row dt {
+      margin: 0;
+      color: var(--steel-dark);
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .kv-row dd {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .kv-row dd strong,
+    .kv-row dd .hl {
+      color: var(--rust);
+      font-weight: 700;
+    }
+
+    #mapMorePanel .panel-hint {
+      flex-shrink: 0;
+      padding: 0 14px 10px;
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: center;
+      opacity: 0.85;
+    }
+
+    #mapMorePanel .panel-hint i {
+      margin: 0 4px;
+      color: var(--river);
+    }
+
+    /* 总览：炫目动态边框信息表（侧栏内） */
+    .info-table-wrap {
+      margin-top: 14px;
+      padding: 3px;
+      border-radius: 10px;
+      background: linear-gradient(
+        120deg,
+        var(--rust),
+        var(--accent),
+        var(--river),
+        var(--rust-light),
+        var(--rust)
+      );
+      background-size: 300% 300%;
+      animation: tableGlow 6s ease infinite;
+    }
+
+    @keyframes tableGlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    .info-table-inner {
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .info-table thead th {
+      background: linear-gradient(180deg, var(--concrete), #fff);
+      color: var(--steel-dark);
+      padding: 9px 10px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid var(--rust);
+    }
+
+    .info-table tbody td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e8ecef;
+      color: var(--muted);
+      vertical-align: top;
+    }
+
+    .info-table tbody tr:last-child td { border-bottom: none; }
+
+    .info-table tbody tr:hover td {
+      background: rgba(65, 183, 166, 0.08);
+      color: var(--text);
+    }
+
+    #storyPanel .info-table .val {
+      color: var(--rust);
+      font-weight: 700;
+    }
+
+    .btn-more {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(90deg, var(--river), var(--accent));
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.25s var(--ease), box-shadow 0.25s;
+      letter-spacing: 0.04em;
+    }
+
+    .btn-more:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(61, 122, 155, 0.35);
+    }
+
+    .btn-more i { margin-left: 6px; }
+
+    .section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--steel-dark);
+      margin: 14px 0 8px;
+      padding-left: 8px;
+      border-left: 3px solid var(--rust);
+    }
+
+
+    #mapWrap .esri-ui-bottom-left {
+      display: none !important;
+    }
+
+    #mapWrap .esri-ui-top-right {
+      top: auto !important;
+      bottom: 12px !important;
+      right: 12px !important;
+    }
+
+    #mapWrap .esri-ui-top-left {
+      display: none !important;
+    }
+
+    /* ========== 叙事侧栏 ========== */
+    #storyPanel {
+      width: var(--panel-w);
+      min-width: 320px;
+      flex-shrink: 0;
+      background: var(--bg-panel);
+      border-left: 1px solid #c5cdd6;
+      display: flex;
+      flex-direction: column;
+      z-index: 150;
+      box-shadow: var(--shadow);
+    }
+
+    .progress-track {
+      height: 4px;
+      background: #d8dde3;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--river), var(--accent));
+      transition: width 0.55s var(--ease);
+    }
+
+    /* 步骤导航：横向滚动小标签 */
+    .step-nav-wrap {
+      flex-shrink: 0;
+      background: #faf9f7;
+      border-bottom: 1px solid #d0d6dc;
+      position: relative;
+    }
+
+    .step-nav-wrap::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 28px;
+      background: linear-gradient(90deg, transparent, #faf9f7);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    #stepNav {
+      display: flex;
+      flex-wrap: nowrap;
+      padding: 12px 14px 8px;
+      gap: 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: var(--steel) transparent;
+    }
+
+    #stepNav::-webkit-scrollbar {
+      height: 5px;
+    }
+
+    #stepNav::-webkit-scrollbar-thumb {
+      background: var(--steel);
+      border-radius: 3px;
+    }
+
+    .step-pill {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+      min-width: 56px;
+      border: none;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 4px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease);
+      border: 1px solid #d0d6dc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .step-pill .num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--concrete);
+      color: var(--steel-dark);
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 22px;
+      transition: all 0.3s var(--ease);
+    }
+
+    .step-pill .lbl {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--steel-dark);
+      white-space: nowrap;
+      line-height: 1.25;
+    }
+
+    .step-pill:hover {
+      border-color: var(--river);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(61, 122, 155, 0.2);
+    }
+
+    .step-pill.active {
+      border-color: var(--rust);
+      background: #fff8f5;
+      box-shadow: 0 4px 14px rgba(184, 92, 56, 0.25);
+    }
+
+    .step-pill.active .num {
+      background: var(--rust);
+      color: #fff;
+      transform: scale(1.1);
+    }
+
+    .step-pill.active .lbl { color: var(--rust); font-weight: 600; }
+
+    .step-pill.done .num {
+      background: var(--pill-color, var(--accent));
+      color: #fff;
+      opacity: 0.88;
+    }
+
+    .step-pill.upcoming .num {
+      background: color-mix(in srgb, var(--pill-color, var(--concrete)) 28%, #fff);
+      color: var(--steel-dark);
+      border: 1px dashed color-mix(in srgb, var(--pill-color, var(--steel)) 55%, transparent);
+    }
+
+    .step-pill.has-order.active {
+      border-color: var(--pill-color, var(--rust));
+      background: color-mix(in srgb, var(--pill-color, var(--rust)) 10%, #fff);
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--pill-color, var(--rust)) 35%, transparent);
+    }
+
+    .step-pill.has-order.active .num {
+      background: var(--pill-color, var(--rust));
+      color: #fff;
+      transform: scale(1.12);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--pill-color, var(--rust)) 28%, transparent);
+    }
+
+    .step-pill.has-order.active .lbl {
+      color: var(--pill-color, var(--rust));
+      font-weight: 600;
+    }
+
+    #storyBody {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 16px 10px;
+    }
+
+    .story-block {
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+    }
+
+    .story-block.visible,
+    #storyBody.is-initial .story-block {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .step-badge {
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--river);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .step-title {
+      font-size: 1.28rem;
+      line-height: 1.35;
+      color: var(--steel-dark);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .step-title .accent { color: var(--rust); }
+
+    .step-text {
+      font-size: 0.9rem;
+      line-height: 1.75;
+      color: var(--muted);
+    }
+
+    .step-text p + p { margin-top: 10px; }
+    .step-text strong { color: var(--text); }
+
+    .step-meta {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: var(--concrete);
+      border-left: 3px solid var(--accent);
+      font-size: 0.8rem;
+      color: var(--steel-dark);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .story-figure {
+      margin: 12px 0 16px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #c5cdd6;
+      box-shadow: 0 4px 14px rgba(42, 53, 64, 0.08);
+    }
+
+    .story-figure img {
+      width: 100%;
+      max-height: 240px;
+      min-height: 140px;
+      object-fit: cover;
+      display: block;
+      background: var(--concrete);
+    }
+
+    .step-pill.route-pill.active .lbl {
+      animation: routePillPulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes routePillPulse {
+      0%, 100% { opacity: 1; letter-spacing: 0.02em; }
+      50% { opacity: 0.55; letter-spacing: 0.08em; }
+    }
+
+    .route-story-hint {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: linear-gradient(90deg, rgba(184, 92, 56, 0.12), rgba(61, 122, 155, 0.1));
+      border-left: 3px solid var(--rust);
+      font-size: 0.78rem;
+      color: var(--steel-dark);
+      line-height: 1.55;
+    }
+
+    .route-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 10px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .route-legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .route-legend .lg-done::before { background: var(--accent); }
+    .route-legend .lg-route::before { background: var(--rust); }
+
+    /* 驿道步：地图气泡紧贴左上角缩放控件下方 */
+    .route-map-bubble {
+      position: absolute;
+      left: 12px;
+      top: 86px;
+      bottom: auto;
+      z-index: 128;
+      max-width: min(300px, calc(100% - 24px));
+      padding: 12px 14px;
+      background: rgba(244, 241, 235, 0.97);
+      border: 1px solid var(--rust);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+    }
+
+    .route-map-bubble.open {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .route-map-bubble h4 {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 8px;
+      font-size: 0.82rem;
+      color: var(--rust);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .route-bubble-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      background: var(--rust);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      line-height: 1.35;
+    }
+
+    .route-map-bubble p {
+      font-size: 0.74rem;
+      line-height: 1.55;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .route-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 0.68rem;
+    }
+
+    .route-compare .before {
+      padding: 8px;
+      background: rgba(184, 92, 56, 0.12);
+      border-left: 3px solid var(--rust);
+      border-radius: 4px;
+      color: var(--steel-dark);
+    }
+
+    .route-compare .after {
+      padding: 8px;
+      background: rgba(65, 183, 166, 0.12);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      color: var(--steel-dark);
+    }
+
+    .route-map-bubble .route-narrative {
+      font-size: 0.76rem;
+      line-height: 1.65;
+      color: var(--text);
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed #d0d6dc;
+    }
+
+    .route-map-bubble .route-narrative em {
+      color: var(--rust);
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    #viewDiv .esri-popup__header-title {
+      font-size: 0.9rem;
+    }
+
+    .route-node-popup .route-popup-role {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--river);
+      font-weight: 600;
+    }
+
+    .route-node-popup .route-popup-body {
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .route-node-popup.modern-theme .route-popup-role {
+      color: var(--river);
+    }
+
+    .route-node-popup.modern-theme .route-popup-body {
+      color: var(--steel-dark);
+    }
+
+    .data-marker-popup img {
+      display: block;
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      background: var(--concrete);
+    }
+
+    .data-marker-popup .data-popup-tip {
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .story-figure figcaption {
+      padding: 8px 10px;
+      font-size: 0.74rem;
+      color: var(--muted);
+      background: var(--concrete);
+    }
+
+    .data-cards {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .data-card {
+      background: var(--concrete);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      border-left: 3px solid var(--rust);
+    }
+
+    .data-card strong {
+      display: block;
+      font-size: 1.05rem;
+      color: var(--rust);
+    }
+
+    .data-card span { font-size: 0.7rem; color: var(--muted); }
+
+    /* 标签10 · 数据步：分区叙事布局 */
+    .story-data-layout .story-lead {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      background: var(--concrete);
+      border-left: 3px solid var(--rust);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .story-data-layout .story-lead strong {
+      color: var(--rust);
+    }
+
+    .story-data-layout .data-cards {
+      margin-top: 0;
+      margin-bottom: 14px;
+    }
+
+    .story-data-layout .story-figure {
+      margin: 0 0 14px;
+    }
+
+    .story-data-section {
+      margin-bottom: 14px;
+    }
+
+    .story-data-section .section-subtitle {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--steel-dark);
+      margin: 0 0 8px;
+      padding-left: 10px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .story-data-section .section-body {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .story-data-section .section-body p + p {
+      margin-top: 8px;
+    }
+
+    .story-data-highlight {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: linear-gradient(90deg, rgba(61, 122, 155, 0.1), rgba(65, 183, 166, 0.08));
+      border: 1px solid rgba(61, 122, 155, 0.25);
+      border-radius: 8px;
+      font-size: 0.82rem;
+      line-height: 1.65;
+      color: var(--steel-dark);
+    }
+
+    .story-data-highlight strong {
+      color: var(--river);
+    }
+
+    .story-geo-panel {
+      margin-bottom: 14px;
+    }
+
+    .story-geo-panel > .section-subtitle {
+      margin-bottom: 10px;
+    }
+
+    .story-geo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .story-geo-card {
+      background: #fff;
+      border: 1px solid #d0d6dc;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(42, 53, 64, 0.06);
+    }
+
+    .story-geo-card img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      max-height: 200px;
+      background: var(--concrete);
+    }
+
+    .story-geo-card .geo-cap {
+      margin: 0;
+      padding: 8px 10px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--steel-dark);
+      background: var(--concrete);
+      border-bottom: 1px solid #e4e8ec;
+    }
+
+    .story-geo-card .geo-desc {
+      margin: 0;
+      padding: 8px 10px 10px;
+      font-size: 0.76rem;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    /* 标签10 · 地图富化层（不重复右侧统计与 GIS 图解） */
+    .data-map-enrich {
+      position: absolute;
+      left: calc(var(--map-dock-width) + var(--map-dock-left) + 12px);
+      right: 12px;
+      bottom: 32px;
+      z-index: 128;
+      max-width: 520px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(61, 122, 155, 0.4);
+      border-left: 4px solid var(--river);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+    }
+
+    .data-map-enrich.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .data-map-enrich h4 {
+      font-size: 0.82rem;
+      color: var(--steel-dark);
+      margin: 0 0 8px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .data-map-enrich h4 .tag {
+      font-size: 0.68rem;
+      padding: 2px 8px;
+      background: var(--river);
+      color: #fff;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .data-map-enrich .enrich-lead {
+      font-size: 0.74rem;
+      line-height: 1.55;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
+
+    .data-map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.68rem;
+      color: var(--steel-dark);
+    }
+
+    .data-map-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .data-map-legend i {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .data-map-legend .lg-bridge i { background: var(--accent); border-radius: 2px; transform: rotate(45deg); }
+    .data-map-legend .lg-corridor i { background: var(--river); }
+    .data-map-legend .lg-node i { background: #d4a84b; border-radius: 50%; }
+
+    .data-map-route {
+      margin: 0 0 10px;
+      padding-left: 1.15em;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: var(--steel-dark);
+    }
+
+    .data-map-route li + li {
+      margin-top: 4px;
+    }
+
+    .data-map-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .data-map-facts .dm-fact {
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-size: 0.66rem;
+      font-weight: 600;
+      line-height: 1.35;
+      background: rgba(61, 122, 155, 0.1);
+      color: var(--steel-dark);
+      border: 1px solid rgba(61, 122, 155, 0.22);
+    }
+
+    .data-map-enrich .enrich-tip {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .data-map-enrich .enrich-tip i {
+      color: var(--river);
+      margin-right: 4px;
+    }
+
+    #storyControls {
+      display: flex;
+      gap: 8px;
+      padding: 12px 14px;
+      border-top: 1px solid #d0d6dc;
+      background: #faf9f7;
+    }
+
+    #storyControls button {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--steel);
+      background: #fff;
+      color: var(--steel-dark);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s var(--ease);
+    }
+
+    #storyControls button:hover:not(:disabled) {
+      background: var(--river);
+      color: #fff;
+      border-color: var(--river);
+    }
+
+    #storyControls button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #btnNext {
+      background: var(--rust) !important;
+      color: #fff !important;
+      border-color: var(--rust) !important;
+    }
+
+    #btnNext:hover:not(:disabled) {
+      background: #9a4a2c !important;
+      border-color: #9a4a2c !important;
+    }
+
+    .esri-view .esri-view-surface--inset-outline:focus::after { outline: none; }
+
+    @media (max-width: 860px) {
+      #appMain { flex-direction: column-reverse; }
+      #storyPanel { width: 100%; max-height: 46vh; min-width: unset; }
+      #mapWrap { min-height: 50vh; }
+      #mapMorePanel {
+        left: 8px;
+        right: 8px;
+        top: auto;
+        bottom: 40px;
+        width: calc(100% - 16px) !important;
+        max-width: none;
+        max-height: min(48vh, 340px);
+      }
+
+      #mapMorePanel .panel-resize-handle { display: none; }
+
+      #mapWrap {
+        --map-dock-left: 8px;
+        --map-dock-bottom: 8px;
+        --map-dock-width: 168px;
+        --map-dock-overview-h: 132px;
+        --map-dock-tools-h: 36px;
+        --map-dock-gap: 6px;
+      }
+
+      .map-top-left-dock {
+        max-width: calc(100% - 24px);
+      }
+
+      .route-mode-btn {
+        font-size: 0.68rem;
+        padding: 7px 10px;
+      }
+
+      .route-compare-panel {
+        right: 8px;
+        bottom: 32px;
+        max-width: calc(100% - 16px);
+      }
+
+      .story-geo-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .data-map-enrich {
+        left: 8px;
+        right: 8px;
+        bottom: 28px;
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header id="pageHeader">
+    <div>
+      <h1>第一章 · 被高山折叠的土地</h1>
+      <p>ArcGIS Maps SDK · GeoScene 市界 · 地图驱动叙事</p>
+    </div>
+    <div class="header-tools">
+      <select id="basemapSelect" aria-label="底图" title="第1–9步自动街道图，第10步自动地形图；也可手动切换">
+        <option value="streets-navigation-vector" selected>街道图</option>
+        <option value="terrain-relief">地形图（地势晕渲）</option>
+      </select>
+    </div>
+  </header>
+
+  <div id="app">
+    <div id="appMain">
+      <div id="mapWrap">
+        <div id="viewDiv"></div>
+        <div class="map-top-left-dock" id="mapTopLeftDock">
+          <div id="zoomBtnSlot" class="map-zoom-slot" aria-label="地图缩放"></div>
+          <div class="route-mode-toggle" id="routeModeToggle" aria-label="驿道路线对比切换">
+            <button type="button" class="route-mode-btn active" data-mode="ancient" id="btnRouteAncient">🐎 古驿道（建成前）</button>
+            <button type="button" class="route-mode-btn" data-mode="modern" id="btnRouteModern">🚗 现代路网（建成后）</button>
+          </div>
+        </div>
+        <div class="map-coord-bar" id="mapCoordBar" aria-live="polite">
+          <span>经度 <span class="coord-val" id="coordLon">—</span>°</span>
+          <span style="margin: 0 10px; opacity: 0.45">|</span>
+          <span>纬度 <span class="coord-val" id="coordLat">—</span>°</span>
+        </div>
+        <div class="map-corner-dock" id="mapCornerDock">
+          <div class="overview-map-wrap" id="overviewMapWrap" aria-label="左下角贵州省鹰眼图">
+            <div class="overview-map-head">贵州省概览 · 当前范围</div>
+            <div id="overviewViewDiv" class="overview-map-view"></div>
+          </div>
+          <div class="map-corner-tools" aria-label="地图工具">
+            <div id="scaleBarSlot" class="map-corner-tool-slot"></div>
+            <div id="homeBtnSlot" class="map-corner-tool-slot map-corner-home"></div>
+          </div>
+        </div>
+        <div class="route-map-bubble" id="routeMapBubble" aria-hidden="true">
+          <h4><span class="route-bubble-tag">驿道</span><i class="fa-solid fa-person-hiking"></i> 古驿道 · 翻山越岭</h4>
+          <p class="route-narrative">桥建成之前，贵州人民依靠古驿道翻山越岭。<br/>
+            从黔东到黔中，短短几百公里需要走上<strong>十天半月</strong>。<br/>
+            道路险峻，时有山匪，货物损耗严重……<br/>
+            <em>让我们一起沿着古驿道，感受先辈们的艰辛旅程。</em></p>
+          <p>使用左上角按钮切换<strong>古驿道 / 现代路网</strong>对比。建成前为土黄蜿蜒虚线+黄色光点；建成后为蓝色直线+绿色光点。节点处停留 <strong>3.5 秒</strong> 并弹出介绍。</p>
+          <div class="route-compare">
+            <div class="before"><strong>桥建成前</strong><br/>翻山越岭，渡索过涧，数十里脚程常需数日</div>
+            <div class="after"><strong>桥建成后</strong><br/>高速跨谷，天堑变通途，时空距离大幅压缩</div>
+          </div>
+        </div>
+        <div class="route-compare-panel mode-ancient" id="routeComparePanel" aria-hidden="true">
+          <button type="button" class="btn-compare-close" id="btnRouteCompareClose" title="关闭对比说明">×</button>
+          <h5 id="routeCompareTitle">建成前 · 古驿道</h5>
+          <p id="routeCompareText">昔日古驿道：翻山越岭，马帮铃响，镇远到遵义需时10-15天。道路险峻，渡索过涧，货物损耗严重。</p>
+        </div>
+        <div class="data-map-enrich" id="dataMapEnrich" aria-hidden="true">
+          <h4><span class="tag">地图</span>现场探索 · 超级工程</h4>
+          <p class="enrich-lead">右侧为统计与 GIS 图解；本地图补充<strong>具体桥隧与通道</strong>的空间位置，请点击标注查看工程解读。</p>
+          <ol class="data-map-route">
+            <li>先缩放到<strong>西北</strong>（花江、坝陵河一带）看深切峡谷与高桥</li>
+            <li>东移查看<strong>沪昆高铁走廊</strong>的直线桥隧带</li>
+            <li>北至<strong>赤水河谷</strong>观察贴河而行的遵赤通道</li>
+          </ol>
+          <div class="data-map-legend" aria-label="标注图例">
+            <span class="lg-bridge"><i></i>菱形 · 超级桥梁</span>
+            <span class="lg-corridor"><i></i>蓝色 · 现代通道</span>
+            <span class="lg-node"><i></i>圆点 · 枢纽/节点</span>
+          </div>
+          <div class="data-map-facts">
+            <span class="dm-fact">县县通高速 · 2015</span>
+            <span class="dm-fact">高速近 9000 km</span>
+            <span class="dm-fact">世界前100高桥近半在黔</span>
+            <span class="dm-fact">西部陆海新通道节点</span>
+          </div>
+          <p class="enrich-tip"><i class="fa-solid fa-hand-pointer"></i>点击地图标注获取桥梁结构、通道走向等右侧未展开的现场信息。</p>
+        </div>
+        <div class="map-badge" id="mapBadge"><strong>当前视点</strong> · 贵州省域总览</div>
+        <p class="map-attribution">Esri, © OpenStreetMap contributors, TomTom, Garmin, FAO, NOAA, USG</p>
+        <aside id="mapMorePanel" aria-hidden="true">
+          <div class="panel-resize-handle" id="mapMoreResize" title="拖动左侧边缘调整宽度" aria-label="调整面板宽度"></div>
+          <div class="panel-inner">
+            <div class="panel-head">
+              <h3><i class="fa-solid fa-table-list"></i> 贵州省基础信息 <span style="font-size:0.68rem;font-weight:400;opacity:0.85">· 年鉴2026</span></h3>
+              <button type="button" class="btn-close" id="btnCloseMore" title="关闭">×</button>
+            </div>
+            <div class="panel-scroll" id="mapMoreContent"></div>
+            <p class="panel-hint"><i class="fa-solid fa-arrows-left-right"></i> 拖动左缘可横向拉宽信息框</p>
+          </div>
+        </aside>
+      </div>
+
+      <aside id="storyPanel">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="step-nav-wrap">
+        <nav id="stepNav" aria-label="章节步骤"></nav>
+      </div>
+      <div id="storyBody" class="is-initial"></div>
+      <div id="storyControls">
+        <button type="button" id="btnPrev"><i class="fa-solid fa-chevron-left"></i> 上一步</button>
+        <button type="button" id="btnNext">下一步 <i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://js.arcgis.com/4.30/"></script>
+  <script>
+    require([
+      "esri/Map",
+      "esri/Basemap",
+      "esri/views/MapView",
+      "esri/layers/TileLayer",
+      "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
+      "esri/Ground",
+      "esri/geometry/Extent",
+      "esri/geometry/Point",
+      "esri/geometry/Polyline",
+      "esri/geometry/projection",
+      "esri/widgets/ScaleBar",
+      "esri/widgets/Compass",
+      "esri/widgets/Home",
+      "esri/widgets/Zoom"
+    ], function (
+      Map, Basemap, MapView, TileLayer, FeatureLayer, GraphicsLayer, Graphic, Ground, Extent, Point, Polyline, projection,
+      ScaleBar, Compass, Home, Zoom
+    ) {
+      var MEDIA = {
+        huangguoshu: "https://dimg04.c-ctrip.com/images/0HJ5212000riv4eq950B4_W_2048_1536.jpg_.webp?_fr=wc",
+        pingba: "https://p8.itc.cn/q_70/images03/20220314/c79f178235c2449e95a4572abe09175d.jpeg",
+        qingyan: "https://th.bing.com/th/id/R.89fbeff989c242dd181e388ad77632d6?rik=BS72qK0CGNgnAA&riu=http%3a%2f%2fn.sinaimg.cn%2fsinacn20113%2f372%2fw1692h1080%2f20190429%2f1cc2-hwfpcxm9226967.jpg&ehk=aoU1njP94iFQDjVqbUG6l3jeH8m0Gq29Z2HPRTkT7I4%3d&risl=&pid=ImgRaw&r=0",
+        miao: "https://bkimg.cdn.bcebos.com/pic/faf2b2119313b07eca80bebd7e9b862397dda144267b?x-bce-process=image/format,f_auto",
+        zhaoxing: "https://bkimg.cdn.bcebos.com/pic/d009b3de9c82d158ccbfc7d764530ed8bc3eb135e419?x-bce-process=image/format,f_auto/watermark,image_d2F0ZXIvYmFpa2UyNzI,g_7,xp_5,yp_5,P_20/resize,m_lfit,limit_1,h_1080",
+        fanjingshan: "https://news.cgtn.com/news/3d3d414f3351444f31457a6333566d54/img/84e78dbc92f542a5bde8fc1fd37f380c/84e78dbc92f542a5bde8fc1fd37f380c.jpg",
+        zunyi: "https://bkimg.cdn.bcebos.com/pic/562c11dfa9ec8a13b750378cf603918fa0ecc010?x-bce-process=image/format,f_auto/watermark,image_d2F0ZXIvYmFpa2UyNzI,g_7,xp_5,yp_5,P_20/resize,m_lfit,limit_1,h_1080",
+        karst: "https://th.bing.com/th/id/R.9ab981005ea157fad8104b3b4f9246d3?rik=h42huoc7ukgdOA&riu=http%3a%2f%2fn.sinaimg.cn%2fsinacn20191024ac%2f600%2fw1920h1080%2f20191024%2fa3aa-ihmipqw2665320.jpg&ehk=tjVoM%2fLC7ABsZq8h91abr8muXYxKdxFihpVQMgWy%2bc4%3d&risl=&pid=ImgRaw&r=0",
+        dem: "./贵州DEM渲染图.png",
+        slope: "./贵州坡度图.png"
+      };
+
+      var BOUNDARY_URL =
+        "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省桥梁市界/FeatureServer/1";
+
+      var GUIZHOU_BASIC = [
+        { label: "简称", value: "黔 / 贵州" },
+        { label: "省会", value: "贵阳市" },
+        { label: "面积", value: "约 17.6 万 km²" },
+        { label: "常住人口", value: "3860 万（2025末）" },
+        { label: "地区生产总值", value: "约 2.18 万亿元（2025）" },
+        { label: "城镇化率", value: "约 59.2%（2025）" },
+        { label: "地形特征", value: "山地丘陵占 92.5%" },
+        { label: "数据口径", value: "《贵州统计年鉴2026》" }
+      ];
+
+      var GUIZHOU_MORE = [
+        {
+          title: "行政区划",
+          rows: [
+            { label: "地级市州", value: "9 个（贵阳、六盘水、遵义、安顺、毕节、铜仁、黔西南、黔东南、黔南）" },
+            { label: "县市区", value: "88 个" },
+            { label: "民族构成", value: "汉族约 62%，少数民族约 38%" }
+          ]
+        },
+        {
+          title: "自然地理",
+          rows: [
+            { label: "平均海拔", value: "约 1100 m" },
+            { label: "最高点", value: "韭菜坪 2900.6 m" },
+            { label: "山头数量", value: "约 125.8 万个" },
+            { label: "坡度>25°", value: "约占国土 61%" },
+            { label: "气候", value: "亚热带湿润季风气候" }
+          ]
+        },
+        {
+          title: "交通与桥梁",
+          rows: [
+            { label: "高速里程", value: "近 9000 km（2026）" },
+            { label: "县县通高速", value: "2015 年实现" },
+            { label: "世界高桥", value: "前 100 高桥近半在黔" },
+            { label: "代表工程", value: "北盘江第一桥、平塘特大桥、花江峡谷大桥" },
+            { label: "产业标签", value: "「世界桥梁博物馆」" }
+          ]
+        },
+        {
+          title: "文化与经济",
+          rows: [
+            { label: "非遗", value: "苗族吊脚楼营造技艺等" },
+            { label: "旅游", value: "黄果树、西江苗寨、青岩古镇" },
+            { label: "特色产业", value: "酱香白酒、大数据、清洁能源" },
+            { label: "战略定位", value: "西部陆海新通道重要节点" }
+          ]
+        },
+        {
+          title: "人口与就业（年鉴2026）",
+          rows: [
+            { label: "常住人口", value: "3860 万人（2025 年末）" },
+            { label: "出生率", value: "约 10.8‰" },
+            { label: "城镇化率", value: "59.2%" },
+            { label: "城镇就业", value: "新增城镇就业约 35 万人/年" },
+            { label: "劳动力", value: "技能人才与外出务工回流并存" }
+          ]
+        },
+        {
+          title: "国民经济（年鉴2026）",
+          rows: [
+            { label: "地区生产总值", value: "约 21750 亿元（2025）" },
+            { label: "经济增速", value: "约 5.0%（不变价）" },
+            { label: "第三产业占比", value: "约 54%" },
+            { label: "一般公共预算收入", value: "约 1580 亿元" },
+            { label: "居民人均可支配收入", value: "城镇约 4.3 万元 / 农村约 1.5 万元" }
+          ]
+        },
+        {
+          title: "农业农村（年鉴2026）",
+          rows: [
+            { label: "粮食总产量", value: "约 1120 万吨" },
+            { label: "油料产量", value: "油菜籽约 260 万吨" },
+            { label: "特色经济作物", value: "茶叶、辣椒、猕猴桃、刺梨" },
+            { label: "畜牧业", value: "生态畜牧与林下养殖" },
+            { label: "乡村振兴", value: "特色田园村寨、高标准农田建设" }
+          ]
+        },
+        {
+          title: "投资消费与工业",
+          rows: [
+            { label: "固定资产投资", value: "工业与基础设施投资占主导" },
+            { label: "社会消费品零售", value: "约 5200 亿元" },
+            { label: "规模以上工业", value: "酱香白酒、磷化工、装备制造、新材料" },
+            { label: "数字经济", value: "贵阳贵安「数谷」算力与数据产业" },
+            { label: "清洁能源", value: "风电、光伏、水电并举" }
+          ]
+        },
+        {
+          title: "开放、旅游与生态",
+          rows: [
+            { label: "旅游总收入", value: "约 8500 亿元（2025）" },
+            { label: "接待游客", value: "约 8.5 亿人次" },
+            { label: "进出口总额", value: "约 850 亿元" },
+            { label: "森林覆盖率", value: "约 63%" },
+            { label: "优良空气天数", value: "中心城市常年 95% 以上" }
+          ]
+        }
+      ];
+
+      /* 地图初始中心与全省总览/数据步共用（须在 STEPS 之前定义，避免与 provinceView 不一致） */
+      var GUIZHOU_CENTER = [106.9266, 27.4444];
+      var GUIZHOU_SCALE = (function () {
+        var latRad = GUIZHOU_CENTER[1] * Math.PI / 180;
+        return Math.round(591657527.591555 * Math.cos(latRad) / Math.pow(2, 7.35));
+      })();
+
+      var STEPS = [
+        {
+          id: "intro",
+          pill: "总览",
+          badge: "第一章",
+          title: "被高山<span class='accent'>折叠</span>的土地",
+          mapLabel: "贵州省域总览",
+          showBasicTable: true,
+          body: [
+            "<p>贵州位于中国西南腹地，东接湖南、南邻广西、西连云南、北靠四川与重庆，是长江与珠江两大水系的分水岭地带，也是中国西南喀斯特地貌最典型、最集中的省份之一。</p>",
+            "<p>全省国土面积约 <strong>17.6 万 km²</strong>，常住人口约 <strong>3860 万</strong>，辖 <strong>9 个</strong>地级市（州）。省会贵阳地处黔中腹地，遵义、六盘水、安顺、毕节、铜仁、黔东南、黔南、黔西南共同构成「山地组团」式城镇格局。</p>",
+            "<p>贵州素有「<strong>地无三尺平</strong>」之称：山地丘陵约占 <strong>92.5%</strong>，坝子、台地、河谷阶地等可连片耕作的土地极为稀缺。乌蒙山、大娄山、苗岭、武陵山等山脉纵横切割，赤水河、乌江、北盘江、红水河等水系深切下切，形成峰丛、洼地、峡谷、天坑并存的喀斯特景观。</p>",
+            "<p>这里气候温润、雨热同季，森林覆盖率长期位居全国前列；同时孕育了苗族、布依族、侗族、水族等多民族聚居区，西江苗寨、肇兴侗寨、青岩古镇等成为山地人居的活态样本。酱香白酒、大数据产业、清洁能源与生态旅游，正在把「山地包袱」转化为新的发展优势。</p>",
+            "<p>由于地形破碎、坡度陡峭，历史上交通极为不便——「<strong>翻山半天</strong>」「<strong>望山兴叹</strong>」曾是许多村寨的真实写照。改革开放特别是近二十年来，贵州推进「高速平原」建设，高速公路里程跃居全国前列，北盘江第一桥、平塘特大桥、花江峡谷大桥等超级工程，让「世界桥梁博物馆」成为新的地域名片。</p>",
+            "<p>本章将带你从<strong>省域总览</strong>出发，依次走进<strong>黄果树、平坝、青岩古镇、西江苗寨、肇兴侗寨、梵净山、遵义</strong>等典型地标；在<strong>驿道</strong>一步回顾桥未建成前的通行路线，再用<strong>数据</strong>读懂「山如何塑造路、路又如何改变山」。可点击右侧横向标签按顺序跳转。</p>"
+          ],
+          center: GUIZHOU_CENTER,
+          provinceView: true,
+          tilt: 0,
+          highlight: null
+        },
+        {
+          id: "huangguoshu",
+          pill: "黄果树",
+          badge: "安顺市镇宁",
+          title: "黄果树瀑布 · 喀斯特水动力奇观",
+          mapLabel: "安顺市镇宁县黄果树",
+          body: [
+            "<p><strong>地点：</strong>安顺市镇宁布依族苗族自治县。<strong>地位：</strong>国家 5A 级景区，亚洲最大的瀑布群之一，也是贵州最具国际知名度的自然景观。</p>",
+            "<p>黄果树瀑布主瀑高 <strong>77.8 米</strong>、宽 <strong>101 米</strong>，丰水期水量可达每秒数百立方米，水雾可弥漫数百米。景区由大瀑布、陡坡塘、天星桥等子景区组成，发育于典型的喀斯特「落水洞—地下河—地表瀑布」链状水文系统，展示了云贵高原地表水强烈下切的过程。</p>",
+            "<p>历史上，这一带通行依赖河谷栈道与山路，镇宁—关岭—安顺之间的往来常需绕行低山垭口。坝陵河峡谷曾长期是黔中交通瓶颈，直至现代桥梁与隧道贯通，才将原本数小时的翻山路程压缩到分钟级。</p>",
+            "<p>今天，黄果树与坝陵河大桥、关岭地质公园、花江峡谷大桥等共同构成黔中旅游走廊，成为观察「山水—路桥—旅游」耦合发展的样本。</p>"
+          ],
+          image: MEDIA.huangguoshu,
+          caption: "黄果树大瀑布 · 典型喀斯特瀑布群",
+          center: [105.67, 25.99],
+          zoom: 12,
+          tilt: 48,
+          highlight: 0
+        },
+        {
+          id: "pingba",
+          pill: "平坝",
+          badge: "黔中坝子",
+          title: "安顺平坝 · 坝子上的黄金",
+          mapLabel: "安顺市平坝区",
+          body: [
+            "<p><strong>地点：</strong>安顺市平坝区（黔中腹地）。<strong>地貌：</strong>贵州罕见的连片坝子与开阔水面。</p>",
+            "<p>平坝区地处黔中平原边缘，坝子（局部盆地）面积虽仅占全市很小比例，却集中了全区大部分耕地与人口。每年春季，万亩油菜花与水库、峰林相映，形成「高原上的江南」景观，是贵州农业与乡村旅游的代表画面。</p>",
+            "<p>在全区 <strong>92.5%</strong> 为山地丘陵的背景下，坝子如同镶嵌在山地海洋中的「绿岛」。历史上，这里是盐运、茶马古道与黔中物资集散的重要节点，通往贵阳、安顺、紫云的方向均需翻越周围低山。</p>",
+            "<p>平坝樱花园、天龙屯堡文化、斯拉河风光带等，使这一片「平地」成为理解贵州人地关系的关键窗口：既珍惜坝子，又不断向周边山地拓展生存与发展空间。</p>"
+          ],
+          image: MEDIA.pingba,
+          caption: "安顺平坝 · 坝子与油菜花",
+          center: [106.26, 26.41],
+          zoom: 11,
+          tilt: 45,
+          highlight: 1
+        },
+        {
+          id: "qingyan",
+          pill: "青岩",
+          badge: "省会南郊",
+          title: "青岩古镇 · 石头城与茶马古道",
+          mapLabel: "贵阳市花溪区青岩镇",
+          body: [
+            "<p><strong>地点：</strong>贵阳市花溪区青岩镇。<strong>历史：</strong>明清军事要塞与茶马古道重镇，贵州四大古镇之一。</p>",
+            "<p>青岩古镇始建于明洪武年间，城墙全长约 <strong>2.5 公里</strong>，以糯米灰浆砌筑青石，街巷、庙宇、会馆、祠堂保存完整，被誉为「石头城」。古镇位于黔中丘陵台地，四面环山，是贵阳南郊通往惠水、龙里、安顺方向的必经之地。</p>",
+            "<p>历史上，商队在此集散盐、茶、布匹与山货，再分赴黔东南、黔南与川南。青岩卤猪脚、糕粑稀饭、玫瑰糖等美食，是山地物资交流与多民族饮食融合的缩影。文昌阁、万寿宫、赵公祠等建筑，记录了移民、屯垦与商贸的层积历史。</p>",
+            "<p>今天，青岩已是贵阳城市圈的重要文旅节点，但周边仍可见深切的喀斯特峰丛。它提醒我们：即便古镇本身处于交通要冲，向外延伸的每一步，仍要面对山地阻隔——这正是贵州后来必须「跨谷架桥」的深层原因。</p>"
+          ],
+          image: MEDIA.qingyan,
+          caption: "青岩古镇 · 石砌城墙与街巷",
+          center: [106.69, 26.33],
+          zoom: 13,
+          tilt: 55,
+          highlight: 2
+        },
+        {
+          id: "miao",
+          pill: "苗寨",
+          badge: "黔东南",
+          title: "西江千户苗寨 · 吊脚楼与山脊",
+          mapLabel: "雷山县西江镇",
+          body: [
+            "<p><strong>地点：</strong>黔东南雷山县西江镇。<strong>规模：</strong>中国最大的苗族聚居村寨之一，俗称「西江千户苗寨」。</p>",
+            "<p>苗寨沿白水河两岸依山而建，上千座吊脚楼层层叠叠，形成壮观的山地聚落图谱。建筑采用榫卯木结构，底层畜圈、中层住人、顶层储粮，适应湿热气候与陡坡地形。2006 年「苗族吊脚楼营造技艺」列入国家级非物质文化遗产名录。</p>",
+            "<p>这里保存着苗族飞歌、芦笙舞、银饰锻制、鼓藏文化等活态传统。过去，出寨往往需沿山路步行数小时才能抵达县城，物资运输依赖人力背驮与马帮，雨季山路泥泞难行，是典型的「望山兴叹」体验。</p>",
+            "<p>西江的变迁，是贵州交通史的一面镜子：从翻山越岭到旅游公路、高速、桥梁相连，苗寨既保留了文化独特性，也深度融入现代交通网络。</p>"
+          ],
+          image: MEDIA.miao,
+          caption: "西江千户苗寨 · 依山而建的聚落",
+          center: [108.18, 26.49],
+          zoom: 12,
+          tilt: 50,
+          highlight: 3
+        },
+        {
+          id: "zhaoxing",
+          pill: "肇兴侗寨",
+          badge: "黔东南黎平",
+          title: "肇兴侗寨 · 鼓楼与侗族大歌",
+          mapLabel: "黔东南州黎平县肇兴镇",
+          body: [
+            "<p><strong>地点：</strong>黔东南黎平县肇兴侗寨。<strong>地位：</strong>全国最大侗族村寨之一，鼓楼群与侗族大歌闻名于世。</p>",
+            "<p>肇兴五座鼓楼（仁义礼智信）分布于寨内，与花桥、吊脚楼、禾仓共同构成侗族建筑体系。侗族大歌为多声部无伴奏合唱，2009 年列入人类非物质文化遗产代表作名录，常在节庆与迎宾仪式中演唱。</p>",
+            "<p>村寨沿山谷展开，梯田、稻田与林地在垂直方向上分层利用，体现「稻鱼共生」「林粮间作」的传统生态智慧。历史上，黎平通向湖南、广西的驿道多沿河谷穿行，肇兴是黔桂湘交界民族走廊上的重要节点。</p>",
+            "<p>如今，贵广高铁、厦蓉高速等现代交通极大缩短了肇兴与外界的距离，但寨内仍保留着慢节奏的山地生活。这里是观察「桥梁时代」如何改变深山聚落命运的重要样本。</p>"
+          ],
+          image: MEDIA.zhaoxing,
+          caption: "肇兴侗寨 · 鼓楼与河谷聚落",
+          center: [109.18, 25.91],
+          zoom: 12,
+          tilt: 50,
+          highlight: 4
+        },
+        {
+          id: "fanjingshan",
+          pill: "梵净山",
+          badge: "铜仁江口",
+          title: "梵净山 · 云瀑与生物多样性",
+          mapLabel: "铜仁市江口县梵净山",
+          body: [
+            "<p><strong>地点：</strong>铜仁市江口县梵净山。<strong>地位：</strong>世界自然遗产、国家 5A 级景区，佛教名山与生物多样性热点。</p>",
+            "<p>梵净山主峰「蘑菇石」一带海拔约 <strong>2493 米</strong>，红云金顶、老金顶等峰丛耸立云海之上，是黔东北典型的变质砂岩「孤峰」地貌。山体垂直带谱完整，从亚热带常绿阔叶林到山地苔藓矮林，分布着珙桐（鸽子花）、红豆杉等珍稀植物，也是黔金丝猴等动物的栖息地。</p>",
+            "<p>历史上，朝山香客与山民往来依赖陡峭石阶与山间小路，冬季冰雪封路时常中断。江口—梵净山—铜仁之间的通行，需翻越武陵山余脉，耗时漫长且风险较高。</p>",
+            "<p>今天，索道、旅游公路与高速网使登顶与出山便捷许多，但山体本身的陡峭与生态脆弱性并未改变。梵净山是贵州「高山生态屏障」的象征，也诠释了为何许多交通工程必须绕开或跨越这样的山地障碍。</p>"
+          ],
+          image: MEDIA.fanjingshan,
+          caption: "梵净山 · 云瀑与峰丛",
+          center: [108.76, 27.92],
+          zoom: 11,
+          tilt: 55,
+          highlight: 5
+        },
+        {
+          id: "zunyi",
+          pill: "遵义",
+          badge: "黔北红色名城",
+          title: "遵义 · 红色文化与酱香白酒",
+          mapLabel: "遵义市红花岗区",
+          body: [
+            "<p><strong>地点：</strong>遵义市红花岗区。<strong>地位：</strong>国家历史文化名城，红色旅游城市，黔北中心城市。</p>",
+            "<p>1935 年 1 月，中共中央政治局在此召开遵义会议，是中国共产党历史上生死攸关的转折点。会址原为军阀公馆，建筑融合中西风格，现为国家重点文物保护单位与爱国主义教育基地。</p>",
+            "<p>遵义地处赤水河流域，是酱香型白酒的核心产区，茅台、习酒、国台等品牌闻名全国。黔北地貌以低山丘陵与河谷盆地交错为特征，历史上是川黔驿道、盐运通道的重要枢纽，通往重庆、贵阳、泸州的方向均需翻山越岭。</p>",
+            "<p>现代，遵义成为成渝地区双城经济圈南向通道的关键节点，高铁、高速公路密度在贵州居于前列。古城红色记忆、赤水河谷酒业与山地城镇扩张交织，构成贵州「交通改善—产业崛起—城镇生长」的生动案例。</p>"
+          ],
+          image: MEDIA.zunyi,
+          caption: "遵义会议会址 · 红色文化地标",
+          center: [106.92, 27.69],
+          zoom: 11,
+          tilt: 45,
+          highlight: 6
+        },
+        {
+          id: "oldroute",
+          pill: "驿道",
+          badge: "桥前的贵州",
+          title: "古驿道 · 翻山越岭的通行线",
+          mapLabel: "黔境古驿道示意",
+          showRouteAnim: true,
+          body: [
+            "<p><strong>主题：</strong>在万座现代桥梁出现之前，贵州的山地交通依靠什么？——答案是：蜿蜒的古驿道、盐运道与茶马古道。</p>",
+            "<p>贵州自古「地无三尺平」，官方驿传与民间商旅只能沿河谷台地、山腰垭口、之字形盘山小路前行。地图上的<strong>独立橙色路线</strong>并非前面七个景点的连线，而是一条贯穿黔境山区的<strong>历史通行走廊示意</strong>：从黔东南山地进入，翻越苗岭丘陵，折向黔中谷地，再北向武陵山麓，途中多次跨河、绕岭、登高。</p>",
+            "<p>物资运输依赖人力背驮与马帮驮运。雨季泥泞溜滑，冬季凝冻封路，「望山兴叹」「翻山半天」是常态。乌江、北盘江、清水江等大河往往只有索桥、独木桥或蹚水渡口，通行既慢且险。</p>",
+            "<p>请观察地图动画：左上角可切换<strong>古驿道（建成前）</strong>与<strong>现代路网（建成后）</strong>。两条路线均以<strong>镇远</strong>为起点、<strong>遵义</strong>为终点，便于对比。建成前蜿蜒曲折、光点较慢；建成后为蓝色直线高速、绿色光点更快。每到达关键节点停留 <strong>3.5 秒</strong>并弹出介绍。</p>",
+            "<p><strong>桥建成前 vs 建成后：</strong>昔日数十里山路需走数日；今日高速与特大桥梁将天堑变为通途，时空距离被大幅压缩——这正是贵州被称为「世界桥梁博物馆」的深层原因。</p>",
+            '<div class="route-story-hint"><i class="fa-solid fa-route"></i> 地图左上角「驿道」叙事框（缩放下方）介绍整体背景；关键节点说明在地图弹窗中逐站展示。</div>',
+            '<div class="route-legend"><span class="lg-route">土黄虚线 · 古驿道全程</span><span class="lg-route" style="--pill-color:#da5828">光点 · 行旅方向</span></div>'
+          ],
+          center: GUIZHOU_CENTER,
+          provinceView: true,
+          animateView: true,
+          tilt: 0,
+          highlight: null
+        },
+        {
+          id: "data",
+          pill: "数据",
+          badge: "数字里的山",
+          title: "125.8 万个山头 · 修路只能架桥",
+          mapLabel: "喀斯特峰丛 · 全省地势",
+          layout: "data-story",
+          lead: "<p><strong>核心结论：</strong>在贵州，修路往往绕不过去、铲不平，只能<strong>用桥把山与山连起来</strong>——数据与地貌共同解释了「世界桥梁博物馆」的必然性。</p>",
+          body: [
+            "<p>贵州地处云贵高原东缘，喀斯特地貌广泛发育。峰丛、洼地、峡谷与地下河系统切割地表，形成「地无三尺平」的空间格局，也直接决定了交通工程必须以桥隧为主。</p>",
+            "<p>从工程标准看，国家四级公路最大纵坡仅 <strong>9%</strong>，而省内大量路段自然坡度远超该限值。若仅依赖盘山公路，不仅里程长、造价高，运营安全风险也显著增加。</p>"
+          ],
+          sections: [
+            {
+              title: "地形约束",
+              paragraphs: [
+                "山地丘陵约占全省国土 <strong>92.5%</strong>，可连片开发的坝地与河谷阶地稀缺。",
+                "约 <strong>61%</strong> 的土地坡度超过 <strong>25°</strong>，适宜大规模直线展线的用地极少。"
+              ]
+            },
+            {
+              title: "空间尺度",
+              paragraphs: [
+                "据测算，全省山头数量级约 <strong>125.8 万个</strong>，地形破碎度在全国居于前列。",
+                "同一行政区间内，直线距离不远，但实际路网里程往往因绕岭跨谷而大幅拉长。"
+              ]
+            }
+          ],
+          mapHint: "进入本步地图已切换「地形图（地势晕渲）」。建议缩放、平移观察峰丛、河谷与切割地貌，并对照右侧数据理解为何贵州必须「以桥代路」。",
+          image: MEDIA.karst,
+          caption: "喀斯特峰丛河谷 · 航拍俯瞰（示意贵州典型山地景观）",
+          meta: "数据口径参考《贵州统计年鉴2026》及国土空间相关公开资料；地形比例数为叙事化呈现。",
+          dataCards: [
+            { value: "92.5%", label: "山地丘陵占比" },
+            { value: "61%", label: "坡度 > 25° 土地" },
+            { value: "125.8万", label: "山头数量级" },
+            { value: "9%", label: "四级路最大纵坡" }
+          ],
+          geoFigures: [
+            {
+              src: MEDIA.dem,
+              title: "贵州 DEM 渲染图",
+              caption: "数字高程模型（DEM）晕渲",
+              desc: "以色调与明暗反映全省高程起伏：亮色/高海拔区与暗色/低洼河谷相间分布。黔北大娄山、东北武陵山及中部峰丛地带高差显著，直观呈现山地丘陵占 <strong>92.5%</strong> 的空间基底，也说明河谷切割强烈、交通线难以拉直。"
+            },
+            {
+              src: MEDIA.slope,
+              title: "贵州坡度图",
+              caption: "坡度分级分布",
+              desc: "按坡度区间设色展示地表陡缓：暖色或深色区域多为陡坡带，对应坡度 <strong>&gt; 25°</strong> 的连片分布，与「约 <strong>61%</strong> 土地超过 25°」的统计相互印证。大面积中高坡度国土意味着修公路需绕山、削坡或架桥，工程代价与安全风险均高于平原地区。"
+            }
+          ],
+          center: GUIZHOU_CENTER,
+          provinceView: true,
+          tilt: 0,
+          highlight: null
+        }
+      ];
+
+      var AGOL = "https://services.arcgisonline.com/ArcGIS/rest/services/";
+      var BASEMAP_STREETS = "streets-navigation-vector";
+      /* 第9步「数据」：地形图 + 晕渲，突出地势起伏 */
+      var terrainReliefBasemap = new Basemap({
+        baseLayers: [
+          new TileLayer({
+            url: AGOL + "World_Topo_Map/MapServer",
+            title: "世界地形图"
+          }),
+          new TileLayer({
+            url: AGOL + "Elevation/World_Hillshade/MapServer",
+            title: "地形晕渲",
+            opacity: 0.58
+          })
+        ],
+        title: "地形图（地势晕渲）"
+      });
+      var BASEMAP_LOOKUP = {
+        "streets-navigation-vector": BASEMAP_STREETS,
+        "terrain-relief": terrainReliefBasemap
+      };
+      var DATA_STEP_INDEX = STEPS.length - 1;
+      var DEFAULT_BASEMAP = BASEMAP_STREETS;
+
+      /* 标签10：地图标注（仅工程/通道现场信息，不重复右侧统计） */
+      var DATA_MAP_MARKERS = [
+        {
+          name: "花江峡谷大桥",
+          lon: 105.78,
+          lat: 25.58,
+          type: "bridge",
+          image: "https://img4.pconline.com.cn/pconline/images/pconline_cms/20250928/35102329.jpg",
+          tip: "桥面距水面垂直高差约 625 m，属世界高桥中的极端案例。可在此观察「一线天」式峡谷里，如何用索塔+钢桁梁跨越几乎直立的崖壁。"
+        },
+        {
+          name: "坝陵河大桥",
+          lon: 105.67,
+          lat: 26.02,
+          type: "bridge",
+          image: "https://rs-channel.huanqiucdn.cn/imageDir/81c36eb88c158da8d5d09c3ac973744fu5.jpg",
+          tip: "单跨钢桁梁悬索桥，跨越坝陵河深峡，把黄果树—关岭—安顺连成快速通道，替代过去需下切峡谷的盘山线。"
+        },
+        {
+          name: "平塘天空之桥",
+          lon: 107.12,
+          lat: 25.78,
+          type: "bridge",
+          image: "https://tse3.mm.bing.net/th/id/OIP.EapcuVxGBwBBTky3u5nSvgHaEK?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+          tip: "三塔斜拉「天空之桥」景区，桥长居全球前列。山顶观景台可俯瞰整桥与谷地，是桥旅融合的典型项目。"
+        },
+        {
+          name: "沪昆高铁走廊",
+          lon: 107.85,
+          lat: 26.52,
+          type: "corridor",
+          image: "https://www.crecg.com/web/fileDir/resource/cms/2021/03/img_pc_site/2021032216191322425.jpg",
+          tip: "高铁以隧道+桥梁直线穿过黔东南丘陵，桥隧比极高。地图上的「拉直」条带，展示现代通道如何强行缩短山地里程。"
+        },
+        {
+          name: "赤水河谷通道",
+          lon: 106.15,
+          lat: 28.02,
+          type: "corridor",
+          image: "https://th.bing.com/th/id/R.f0d04654f95f3103c78a748af5dad40d?rik=2upzdoDptrAnQQ&riu=http%3a%2f%2fn.sinaimg.cn%2fsinacn09%2f324%2fw984h940%2f20180724%2feca7-hftenhz3802910.jpg&ehk=6fQbU3nfvr3IBmbvMO5MUj5%2fYHBR6EzynyikEB8NhPI%3d&risl=&pid=ImgRaw&r=0",
+          tip: "遵赤高速沿赤水河蜿蜒，串联遵义酒城与川南产区。河谷相对窄平，但两侧山壁仍陡，通道只能贴河布置。"
+        },
+        {
+          name: "贵阳环线城市圈",
+          lon: 106.63,
+          lat: 26.65,
+          type: "node",
+          image: "https://n.sinaimg.cn/sinakd20220330s/88/w1080h608/20220330/dc81-2741354d89123c4d1c82c10cf2b5b83a.jpg",
+          tip: "环城高速与贵新、沪昆等放射线交汇，形成黔中「环+射」枢纽。可对比周边峰丛地带，理解为何枢纽本身也遍布互通立交与桥梁。"
+        }
+      ];
+      /* 鹰眼图固定显示贵州省域：东经 103°–110°，北纬 24°–30° */
+      var GUIZHOU_OVERVIEW_EXTENT = new Extent({
+        xmin: 103,
+        ymin: 24,
+        xmax: 110,
+        ymax: 30,
+        spatialReference: { wkid: 4326 }
+      });
+      /* 地标「点到点」飞行动画 */
+      var MAP_FLY_OPTS = { duration: 1200, easing: "ease-in-out" };
+      var ROUTE_STEP_FLY_OPTS = { duration: 2400, easing: "ease-in-out" };
+
+      /* 驿道关键节点（独立路线，非七个景点连线） */
+      var ROUTE_KEY_NODES = [
+        {
+          name: "镇远古城",
+          lon: 108.42,
+          lat: 27.05,
+          role: "湘黔古道东大门驿站",
+          content: "这里是湘黔古道的重要驿站，商队在此休整补给。舞阳河畔城楼耸立，盐商、茶商南下西进，多在此换马、盘点货物，再翻越苗岭进入黔中。"
+        },
+        {
+          name: "施秉",
+          lon: 108.03,
+          lat: 27.03,
+          role: "云台山垭口前的歇脚点",
+          content: "翻越云台山，山路陡峭，马帮需小心翼翼通过。施秉一带峡谷深切、林密路窄，雨季常遇塌方，行旅往往在此最后检查驮具、等候天晴。"
+        },
+        {
+          name: "黄平",
+          lon: 107.92,
+          lat: 26.89,
+          role: "古驿道上的军事关口",
+          content: "古驿道上的重要关口，曾经有驻军把守。黄平地处黔东通往黔中的咽喉，控扼谷道与山垭，是盐运、军驿与民间商旅必经之地。"
+        },
+        {
+          name: "贵定",
+          lon: 107.24,
+          lat: 26.58,
+          role: "进入黔中腹地的门户",
+          content: "进入黔中腹地，山路逐渐平缓，但仍需多次渡涉河流。贵定是黔南与黔中物资交流的重要节点，谷中集市为长途跋涉的背夫提供粮草与草鞋。"
+        },
+        {
+          name: "贵阳",
+          lon: 106.71,
+          lat: 26.57,
+          role: "驿道交汇的政治经济中心",
+          content: "贵州政治经济中心，各路驿道的交汇点。自黔东、黔南、川南而来的商队在此集散，再分赴遵义、安顺、毕节方向，每一程仍要面对新的山岭。"
+        },
+        {
+          name: "遵义",
+          lon: 106.92,
+          lat: 27.69,
+          role: "川黔驿道北向枢纽",
+          content: "川黔驿道上的北向枢纽，通往重庆、泸州方向。黔北丘陵起伏，古道沿赤水河流域蜿蜒，盐酒茶货在此转运，北上仍需翻越娄山一带险峻山道。"
+        }
+      ];
+
+      var ROUTE_ANCIENT_TRAVEL_MS = 2200;
+      var ROUTE_MODERN_TRAVEL_MS = 900;
+      var ROUTE_NODE_STOP_MS = 3500;
+      var ROUTE_POPUP_CLOSE_MS = 4000;
+      var ROUTE_LOOP_GAP_MS = 1200;
+      var ROUTE_MODE_ANCIENT = "ancient";
+      var ROUTE_MODE_MODERN = "modern";
+      var currentRouteMode = ROUTE_MODE_ANCIENT;
+      var routeComparePanelClosed = false;
+
+      var ROUTE_COMPARE_COPY = {
+        ancient: {
+          title: "建成前 · 古驿道",
+          text: "昔日古驿道：翻山越岭，马帮铃响，镇远到遵义需时10-15天。道路险峻，渡索过涧，货物损耗严重……"
+        },
+        modern: {
+          title: "建成后 · 现代路网",
+          text: "今日贵州路网：桥隧相连，高速通达，镇远到遵义仅需约3.5小时。与古驿道同起终点，路程更直、用时更短，天堑变通途。"
+        }
+      };
+
+      /* 驿道地图点：建成前亮黄色调 */
+      var ROUTE_YELLOW = [255, 236, 59, 1];
+      var ROUTE_YELLOW_BRIGHT = [255, 248, 130, 1];
+      var ROUTE_YELLOW_SOFT = [255, 245, 100, 0.5];
+      var ROUTE_YELLOW_OUTLINE = [255, 193, 7, 1];
+      var ROUTE_YELLOW_OUTLINE_DARK = [230, 160, 0, 1];
+
+      /* 建成后：蓝色路线 + 绿色节点 */
+      var ROUTE_BLUE = [41, 128, 185, 1];
+      var ROUTE_BLUE_LIGHT = [93, 173, 226, 0.55];
+      var ROUTE_GREEN = [46, 204, 113, 1];
+      var ROUTE_GREEN_BRIGHT = [88, 214, 141, 1];
+      var ROUTE_GREEN_SOFT = [46, 204, 113, 0.45];
+      var ROUTE_GREEN_OUTLINE = [39, 174, 96, 1];
+
+      var ANCIENT_TRAVEL_PATH = [];
+      var ROUTE_NODE_PATH_IDX = [];
+      var MODERN_TRAVEL_PATH = [];
+      var MODERN_NODE_PATH_IDX = [];
+
+      var MODERN_ROUTE_NODES = [
+        {
+          name: "镇远·高速互通",
+          lon: 108.43,
+          lat: 27.05,
+          role: "沪昆高速 · 湘黔门户",
+          content: "沪昆高速建成通车，镇远到凯里仅需40分钟，而过去走驿道需要2天。"
+        },
+        {
+          name: "施秉·云台山大桥",
+          lon: 108.14,
+          lat: 27.04,
+          role: "云台山特大桥",
+          content: "云台山特大桥建成，跨越深谷，天堑变通途。车辆不再沿盘山驿道小心翼翼地绕行。"
+        },
+        {
+          name: "黄平·余安高速",
+          lon: 107.93,
+          lat: 26.92,
+          role: "余安高速",
+          content: "余安高速连接黄平，山区行车不再危险。过去翻越垭口需半日，如今一小时即可通过。"
+        },
+        {
+          name: "贵定·贵新高等级公路",
+          lon: 107.25,
+          lat: 26.59,
+          role: "贵新高速",
+          content: "贵新高速贯通，贵定到贵阳缩短至1小时。昔日驿道上的背夫脚程，已被平稳的快速路取代。"
+        },
+        {
+          name: "贵阳·西南交通枢纽",
+          lon: 106.63,
+          lat: 26.65,
+          role: "高铁/高速核心枢纽",
+          content: "贵阳成为西南高铁/高速网核心，连接全国。从镇远方向入黔中，全程由桥隧串联；经贵阳绕城向北，可快速衔接兰海高速前往遵义。"
+        },
+        {
+          name: "遵义·兰海高速枢纽",
+          lon: 106.92,
+          lat: 27.69,
+          role: "兰海/杭瑞高速 · 黔北门户",
+          content: "兰海高速、杭瑞高速在遵义交汇，遵义至重庆、贵阳均可约2小时内抵达。昔日川黔驿道北上娄山关需数日跋涉，如今桥梁隧道贯通赤水河谷，与古驿道同终点而时空距离大幅压缩。"
+        }
+      ];
+
+      function buildWindySegment(from, to, wiggles) {
+        var pts = [[from[0], from[1]]];
+        var i;
+        for (i = 1; i <= wiggles; i++) {
+          var t = i / (wiggles + 1);
+          var lon = from[0] + (to[0] - from[0]) * t + Math.sin(i * 2.17 + from[0]) * 0.11;
+          var lat = from[1] + (to[1] - from[1]) * t + Math.cos(i * 1.83 + from[1]) * 0.08;
+          pts.push([lon, lat]);
+        }
+        pts.push([to[0], to[1]]);
+        return pts;
+      }
+
+      function buildStraightSegment(from, to) {
+        var pts = [[from[0], from[1]]];
+        var t = 0.5;
+        pts.push([
+          from[0] + (to[0] - from[0]) * t + Math.sin(from[0] * 3) * 0.015,
+          from[1] + (to[1] - from[1]) * t + Math.cos(from[1] * 3) * 0.01
+        ]);
+        pts.push([to[0], to[1]]);
+        return pts;
+      }
+
+      function buildPathFromNodes(nodes, useWindy) {
+        var path = [];
+        var nodeIdx = [];
+        var n;
+        var seg;
+        var from;
+        var to;
+        for (n = 0; n < nodes.length; n++) {
+          if (n === 0) {
+            path.push([nodes[n].lon, nodes[n].lat]);
+            nodeIdx.push(0);
+          } else {
+            from = [nodes[n - 1].lon, nodes[n - 1].lat];
+            to = [nodes[n].lon, nodes[n].lat];
+            seg = useWindy ? buildWindySegment(from, to, 5) : buildStraightSegment(from, to);
+            path = path.concat(seg.slice(1));
+            nodeIdx.push(path.length - 1);
+          }
+        }
+        return { path: path, nodeIdx: nodeIdx };
+      }
+
+      function buildAncientTravelPath() {
+        var built = buildPathFromNodes(ROUTE_KEY_NODES, true);
+        ANCIENT_TRAVEL_PATH = built.path;
+        ROUTE_NODE_PATH_IDX = built.nodeIdx;
+      }
+
+      function buildModernTravelPath() {
+        var built = buildPathFromNodes(MODERN_ROUTE_NODES, false);
+        MODERN_TRAVEL_PATH = built.path;
+        MODERN_NODE_PATH_IDX = built.nodeIdx;
+      }
+
+      function syncModernRouteBgGeometry() {
+        if (!modernRouteBgGraphic || !MODERN_TRAVEL_PATH.length) return;
+        modernRouteBgGraphic.geometry = new Polyline({
+          paths: [MODERN_TRAVEL_PATH],
+          spatialReference: { wkid: 4326 }
+        });
+      }
+
+      buildAncientTravelPath();
+      buildModernTravelPath();
+
+      function getRoutePathExtent(paddingFactor) {
+        var path = ANCIENT_TRAVEL_PATH;
+        if (!path.length) return null;
+        var xmin = path[0][0];
+        var xmax = path[0][0];
+        var ymin = path[0][1];
+        var ymax = path[0][1];
+        path.forEach(function (pt) {
+          xmin = Math.min(xmin, pt[0]);
+          xmax = Math.max(xmax, pt[0]);
+          ymin = Math.min(ymin, pt[1]);
+          ymax = Math.max(ymax, pt[1]);
+        });
+        return new Extent({
+          xmin: xmin,
+          ymin: ymin,
+          xmax: xmax,
+          ymax: ymax,
+          spatialReference: { wkid: 4326 }
+        }).expand(paddingFactor != null ? paddingFactor : 1.42);
+      }
+
+      function getRouteState() {
+        return currentRouteMode === ROUTE_MODE_MODERN ? routeStateModern : routeStateAncient;
+      }
+
+      function pathProgressFromNodeIndex(nodeIdx, state) {
+        state = state || getRouteState();
+        var maxIdx = Math.max(1, state.path.length - 1);
+        return state.nodePathIdx[nodeIdx] / maxIdx;
+      }
+
+      function pathProgressBetweenNodes(fromNode, toNode, frac, state) {
+        state = state || getRouteState();
+        var p0 = pathProgressFromNodeIndex(fromNode, state);
+        var p1 = pathProgressFromNodeIndex(toNode, state);
+        return p0 + (p1 - p0) * Math.max(0, Math.min(1, frac));
+      }
+
+      /* 跳转顺序：黄果树→平坝→青岩→苗寨→肇兴→梵净山→遵义（索引 0–6 对应顺序色） */
+      var VIEWPOINTS = [
+        {
+          name: "黄果树瀑布",
+          tip: "镇宁 · 喀斯特瀑布群",
+          lon: 105.67,
+          lat: 25.99,
+          image: MEDIA.huangguoshu
+        },
+        {
+          name: "安顺平坝",
+          tip: "黔中坝子 · 油菜花与农耕区",
+          lon: 106.26,
+          lat: 26.41,
+          image: MEDIA.pingba
+        },
+        {
+          name: "青岩古镇",
+          tip: "贵阳南郊 · 石头城茶马节点",
+          lon: 106.69,
+          lat: 26.33,
+          image: MEDIA.qingyan
+        },
+        {
+          name: "西江千户苗寨",
+          tip: "雷山 · 吊脚楼非遗聚落",
+          lon: 108.18,
+          lat: 26.49,
+          image: MEDIA.miao
+        },
+        {
+          name: "肇兴侗寨",
+          tip: "黎平 · 鼓楼与侗族大歌",
+          lon: 109.18,
+          lat: 25.91,
+          image: MEDIA.zhaoxing
+        },
+        {
+          name: "梵净山",
+          tip: "江口 · 世界自然遗产",
+          lon: 108.76,
+          lat: 27.92,
+          image: MEDIA.fanjingshan
+        },
+        {
+          name: "遵义会议会址",
+          tip: "红花岗 · 红色文化名城",
+          lon: 106.92,
+          lat: 27.69,
+          image: MEDIA.zunyi
+        }
+      ];
+
+      /* 顺序色：第 1 站→第 7 站渐变 */
+      var VIEWPOINT_ORDER_COLORS = [
+        [184, 92, 56],
+        [212, 128, 52],
+        [61, 122, 155],
+        [65, 183, 166],
+        [72, 148, 198],
+        [108, 118, 188],
+        [158, 72, 118]
+      ];
+
+      /* 步骤索引 → 地图视点序号（与 STEPS 中 highlight 一致） */
+      var STEP_HIGHLIGHT_INDEX = STEPS.map(function (s) {
+        return s.highlight != null ? s.highlight : -1;
+      });
+
+      var NARRATIVE_STOP_COUNT = VIEWPOINTS.length;
+
+      var boundaryLayer = new FeatureLayer({
+        url: BOUNDARY_URL,
+        title: "贵州省市界",
+        outFields: [],
+        popupEnabled: true,
+        opacity: 0.72,
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "simple-fill",
+            color: [184, 92, 56, 0.22],
+            outline: { color: [160, 55, 32, 1], width: 2.4 }
+          }
+        }
+      });
+
+      var viewpointLayer = new GraphicsLayer({ title: "叙事视点" });
+      var dataEnrichLayer = new GraphicsLayer({ title: "数据步地图标注", visible: false, listMode: "hide" });
+
+      function getDataMarkerSymbol(type) {
+        var styles = {
+          bridge: {
+            style: "diamond",
+            color: [65, 183, 166, 0.95],
+            outline: [39, 120, 100, 1],
+            size: 13
+          },
+          corridor: {
+            style: "circle",
+            color: [41, 128, 185, 0.92],
+            outline: [255, 255, 255, 1],
+            size: 12
+          },
+          node: {
+            style: "circle",
+            color: [212, 168, 75, 0.95],
+            outline: [184, 92, 56, 1],
+            size: 11
+          }
+        };
+        var s = styles[type] || styles.corridor;
+        return {
+          type: "simple-marker",
+          style: s.style,
+          color: s.color,
+          size: s.size,
+          outline: { color: s.outline, width: 2 }
+        };
+      }
+
+      function buildDataMarkerPopupHtml(attrs) {
+        var html = '<div class="data-marker-popup">';
+        if (attrs.image) {
+          html +=
+            '<img src="' +
+            attrs.image +
+            '" alt="' +
+            (attrs.name || "") +
+            '" loading="lazy" referrerpolicy="no-referrer" />';
+        }
+        html += '<p class="data-popup-tip">' + (attrs.tip || "") + "</p></div>";
+        return html;
+      }
+
+      function initDataEnrichMarkers() {
+        dataEnrichLayer.removeAll();
+        DATA_MAP_MARKERS.forEach(function (m) {
+          dataEnrichLayer.add(
+            new Graphic({
+              geometry: new Point({ longitude: m.lon, latitude: m.lat }),
+              symbol: getDataMarkerSymbol(m.type),
+              attributes: { name: m.name, tip: m.tip, image: m.image || "" },
+              popupTemplate: {
+                title: "{name}",
+                content: function (feature) {
+                  return buildDataMarkerPopupHtml(feature.graphic.attributes);
+                }
+              }
+            })
+          );
+        });
+      }
+
+      initDataEnrichMarkers();
+
+      var routeLayer = new GraphicsLayer({ title: "古驿道", visible: false, listMode: "hide" });
+
+      var routeBgGraphic = new Graphic({
+        geometry: new Polyline({
+          paths: [ANCIENT_TRAVEL_PATH],
+          spatialReference: { wkid: 4326 }
+        }),
+        symbol: {
+          type: "simple-line",
+          color: [194, 154, 90, 0.65],
+          width: 3,
+          style: "dot"
+        }
+      });
+
+      var routeFgGraphic = new Graphic({
+        geometry: new Polyline({
+          paths: [[ANCIENT_TRAVEL_PATH[0], ANCIENT_TRAVEL_PATH[1]]],
+          spatialReference: { wkid: 4326 }
+        }),
+        symbol: {
+          type: "simple-line",
+          color: [218, 88, 42, 1],
+          width: 5,
+          style: "short-dash"
+        }
+      });
+
+      var routeWalkerGraphic = new Graphic({
+        geometry: new Point({
+          longitude: ANCIENT_TRAVEL_PATH[0][0],
+          latitude: ANCIENT_TRAVEL_PATH[0][1]
+        }),
+        symbol: {
+          type: "simple-marker",
+          style: "circle",
+          color: ROUTE_YELLOW_BRIGHT,
+          size: 14,
+          outline: { color: ROUTE_YELLOW_OUTLINE, width: 2.5 }
+        }
+      });
+
+      var routeMuleGraphic = new Graphic({
+        geometry: new Point({
+          longitude: ANCIENT_TRAVEL_PATH[0][0],
+          latitude: ANCIENT_TRAVEL_PATH[0][1]
+        }),
+        symbol: {
+          type: "simple-marker",
+          style: "square",
+          color: ROUTE_YELLOW_SOFT,
+          size: 8,
+          outline: { color: ROUTE_YELLOW_OUTLINE, width: 1.5 }
+        }
+      });
+
+      var routeStartGraphic = new Graphic({
+        geometry: new Point({
+          longitude: ANCIENT_TRAVEL_PATH[0][0],
+          latitude: ANCIENT_TRAVEL_PATH[0][1]
+        }),
+        symbol: {
+          type: "simple-marker",
+          style: "triangle",
+          color: ROUTE_YELLOW,
+          size: 10,
+          angle: 45,
+          outline: { color: ROUTE_YELLOW_OUTLINE_DARK, width: 1.5 }
+        },
+        attributes: { label: "驿道起点" }
+      });
+
+      routeLayer.addMany([
+        routeBgGraphic,
+        routeFgGraphic,
+        routeStartGraphic,
+        routeWalkerGraphic,
+        routeMuleGraphic
+      ]);
+
+      var modernRouteLayer = new GraphicsLayer({ title: "现代路网", visible: false, listMode: "hide" });
+      var modernRouteBgGraphic = new Graphic({
+        geometry: new Polyline({
+          paths: [MODERN_TRAVEL_PATH],
+          spatialReference: { wkid: 4326 }
+        }),
+        symbol: {
+          type: "simple-line",
+          color: ROUTE_BLUE_LIGHT,
+          width: 4,
+          style: "solid"
+        }
+      });
+      var modernRouteFgGraphic = new Graphic({
+        geometry: new Polyline({
+          paths: [[MODERN_TRAVEL_PATH[0], MODERN_TRAVEL_PATH[1]]],
+          spatialReference: { wkid: 4326 }
+        }),
+        symbol: {
+          type: "simple-line",
+          color: ROUTE_BLUE,
+          width: 5,
+          style: "solid"
+        }
+      });
+      var modernRouteWalkerGraphic = new Graphic({
+        geometry: new Point({
+          longitude: MODERN_TRAVEL_PATH[0][0],
+          latitude: MODERN_TRAVEL_PATH[0][1]
+        }),
+        symbol: {
+          type: "simple-marker",
+          style: "circle",
+          color: ROUTE_GREEN_BRIGHT,
+          size: 15,
+          outline: { color: ROUTE_GREEN_OUTLINE, width: 3 }
+        }
+      });
+      var modernRouteMuleGraphic = new Graphic({
+        geometry: new Point({
+          longitude: MODERN_TRAVEL_PATH[0][0],
+          latitude: MODERN_TRAVEL_PATH[0][1]
+        }),
+        symbol: {
+          type: "simple-marker",
+          style: "circle",
+          color: [93, 173, 226, 0.5],
+          size: 18,
+          outline: { color: ROUTE_BLUE, width: 1 }
+        }
+      });
+      var modernRouteStartGraphic = new Graphic({
+        geometry: new Point({
+          longitude: MODERN_TRAVEL_PATH[0][0],
+          latitude: MODERN_TRAVEL_PATH[0][1]
+        }),
+        symbol: {
+          type: "simple-marker",
+          style: "triangle",
+          color: ROUTE_GREEN,
+          size: 10,
+          angle: 45,
+          outline: { color: ROUTE_GREEN_OUTLINE, width: 1.5 }
+        }
+      });
+      modernRouteLayer.addMany([
+        modernRouteBgGraphic,
+        modernRouteFgGraphic,
+        modernRouteStartGraphic,
+        modernRouteWalkerGraphic,
+        modernRouteMuleGraphic
+      ]);
+
+      var routeNodeLayer = new GraphicsLayer({ title: "驿道节点", visible: false, listMode: "hide" });
+      var modernRouteNodeLayer = new GraphicsLayer({ title: "现代路网节点", visible: false, listMode: "hide" });
+      var routeNodeGraphics = [];
+      var modernRouteNodeGraphics = [];
+
+      function createRouteNodeGraphic(node, i, isModern) {
+        return new Graphic({
+          geometry: new Point({ longitude: node.lon, latitude: node.lat }),
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: isModern ? ROUTE_GREEN_SOFT : ROUTE_YELLOW_SOFT,
+            size: 10,
+            outline: {
+              color: isModern ? ROUTE_GREEN_OUTLINE : ROUTE_YELLOW_OUTLINE,
+              width: 1.5
+            }
+          },
+          attributes: { name: node.name, order: i + 1 }
+        });
+      }
+
+      function initRouteNodeMarkers() {
+        routeNodeGraphics = ROUTE_KEY_NODES.map(function (node, i) {
+          return createRouteNodeGraphic(node, i, false);
+        });
+        modernRouteNodeGraphics = MODERN_ROUTE_NODES.map(function (node, i) {
+          return createRouteNodeGraphic(node, i, true);
+        });
+        routeNodeLayer.addMany(routeNodeGraphics);
+        modernRouteNodeLayer.addMany(modernRouteNodeGraphics);
+      }
+
+      initRouteNodeMarkers();
+      syncModernRouteBgGeometry();
+
+      var routeStateAncient = {
+        mode: ROUTE_MODE_ANCIENT,
+        nodes: ROUTE_KEY_NODES,
+        path: ANCIENT_TRAVEL_PATH,
+        nodePathIdx: ROUTE_NODE_PATH_IDX,
+        travelMs: ROUTE_ANCIENT_TRAVEL_MS,
+        layer: routeLayer,
+        nodeLayer: routeNodeLayer,
+        nodeGraphics: routeNodeGraphics,
+        bg: routeBgGraphic,
+        fg: routeFgGraphic,
+        walker: routeWalkerGraphic,
+        mule: routeMuleGraphic,
+        start: routeStartGraphic,
+        popupTheme: ""
+      };
+
+      var routeStateModern = {
+        mode: ROUTE_MODE_MODERN,
+        nodes: MODERN_ROUTE_NODES,
+        path: MODERN_TRAVEL_PATH,
+        nodePathIdx: MODERN_NODE_PATH_IDX,
+        travelMs: ROUTE_MODERN_TRAVEL_MS,
+        layer: modernRouteLayer,
+        nodeLayer: modernRouteNodeLayer,
+        nodeGraphics: modernRouteNodeGraphics,
+        bg: modernRouteBgGraphic,
+        fg: modernRouteFgGraphic,
+        walker: modernRouteWalkerGraphic,
+        mule: modernRouteMuleGraphic,
+        start: modernRouteStartGraphic,
+        popupTheme: "modern-theme"
+      };
+
+      var routeAnimFrameId = null;
+      var routePauseTimer = null;
+      var routeLoopTimer = null;
+      var routeAnimRunning = false;
+      var routeCurrentNodeIdx = 0;
+      var routeMapBubble = document.getElementById("routeMapBubble");
+      var routeModeToggle = document.getElementById("routeModeToggle");
+      var routeComparePanel = document.getElementById("routeComparePanel");
+      var routeCompareTitle = document.getElementById("routeCompareTitle");
+      var routeCompareText = document.getElementById("routeCompareText");
+      var btnRouteCompareClose = document.getElementById("btnRouteCompareClose");
+
+      function sliceRoutePath(progress, state) {
+        state = state || getRouteState();
+        var path = state.path;
+        progress = Math.max(0, Math.min(1, progress));
+        var total = path.length;
+        var seg = Math.max(1, (total - 1) * progress);
+        var fullIdx = Math.floor(seg);
+        var frac = seg - fullIdx;
+        var coords = path.slice(0, fullIdx + 1);
+        if (fullIdx < total - 1 && frac > 0.001) {
+          var a = path[fullIdx];
+          var b = path[fullIdx + 1];
+          coords.push([
+            a[0] + (b[0] - a[0]) * frac,
+            a[1] + (b[1] - a[1]) * frac
+          ]);
+        }
+        return coords.length >= 2 ? coords : [path[0], path[1]];
+      }
+
+      function setWalkerPositions(progress, state) {
+        state = state || getRouteState();
+        var coords = sliceRoutePath(progress, state);
+        var end = coords[coords.length - 1];
+        state.walker.geometry = new Point({
+          longitude: end[0],
+          latitude: end[1]
+        });
+        if (state.mode === ROUTE_MODE_ANCIENT) {
+          var trailProgress = Math.max(0, progress - 0.06);
+          var trail = sliceRoutePath(trailProgress, state);
+          var trailEnd = trail[trail.length - 1];
+          state.mule.geometry = new Point({
+            longitude: trailEnd[0],
+            latitude: trailEnd[1]
+          });
+          state.mule.visible = progress > 0.04;
+        } else {
+          state.mule.geometry = new Point({
+            longitude: end[0],
+            latitude: end[1]
+          });
+          state.mule.visible = progress > 0.02;
+        }
+      }
+
+      function updateRouteAnimationFrame(drawProgress, moveProgress, state) {
+        state = state || getRouteState();
+        var drawCoords = sliceRoutePath(drawProgress, state);
+        state.fg.geometry = new Polyline({
+          paths: [drawCoords],
+          spatialReference: { wkid: 4326 }
+        });
+        setWalkerPositions(moveProgress, state);
+        if (drawProgress >= 1) {
+          var last = state.path[state.path.length - 1];
+          state.start.symbol = state.mode === ROUTE_MODE_MODERN ? {
+            type: "simple-marker",
+            style: "triangle",
+            color: ROUTE_GREEN_BRIGHT,
+            size: 10,
+            angle: -135,
+            outline: { color: ROUTE_GREEN_OUTLINE, width: 1.5 }
+          } : {
+            type: "simple-marker",
+            style: "triangle",
+            color: ROUTE_YELLOW_BRIGHT,
+            size: 10,
+            angle: -135,
+            outline: { color: ROUTE_YELLOW_OUTLINE_DARK, width: 1.5 }
+          };
+          state.start.geometry = new Point({
+            longitude: last[0],
+            latitude: last[1]
+          });
+        } else {
+          state.start.geometry = new Point({
+            longitude: state.path[0][0],
+            latitude: state.path[0][1]
+          });
+          state.start.symbol = state.mode === ROUTE_MODE_MODERN ? {
+            type: "simple-marker",
+            style: "triangle",
+            color: ROUTE_GREEN,
+            size: 10,
+            angle: 45,
+            outline: { color: ROUTE_GREEN_OUTLINE, width: 1.5 }
+          } : {
+            type: "simple-marker",
+            style: "triangle",
+            color: ROUTE_YELLOW,
+            size: 10,
+            angle: 45,
+            outline: { color: ROUTE_YELLOW_OUTLINE_DARK, width: 1.5 }
+          };
+        }
+      }
+
+      function buildRoutePopupHtml(node, theme) {
+        return (
+          '<div class="route-node-popup' + (theme ? " " + theme : "") + '">' +
+          '<p class="route-popup-body">' + node.content + "</p>" +
+          '<p class="route-popup-role">' + node.role + "</p>" +
+          "</div>"
+        );
+      }
+
+      function showRouteNodePopup(node, state) {
+        state = state || getRouteState();
+        if (!view || !node) return;
+        view.openPopup({
+          title: node.name,
+          content: buildRoutePopupHtml(node, state.popupTheme),
+          location: new Point({ longitude: node.lon, latitude: node.lat })
+        });
+      }
+
+      function highlightRouteNodeMarker(nodeIdx, state) {
+        state = state || getRouteState();
+        var isModern = state.mode === ROUTE_MODE_MODERN;
+        state.nodeGraphics.forEach(function (g, i) {
+          var active = i === nodeIdx;
+          g.symbol = {
+            type: "simple-marker",
+            style: "circle",
+            color: active
+              ? (isModern ? ROUTE_GREEN_BRIGHT : ROUTE_YELLOW_BRIGHT)
+              : (isModern ? ROUTE_GREEN_SOFT : ROUTE_YELLOW_SOFT),
+            size: active ? 14 : 10,
+            outline: {
+              color: active
+                ? (isModern ? ROUTE_GREEN_OUTLINE : ROUTE_YELLOW_OUTLINE_DARK)
+                : (isModern ? ROUTE_GREEN_OUTLINE : ROUTE_YELLOW_OUTLINE),
+              width: active ? 2.5 : 1.5
+            }
+          };
+        });
+      }
+
+      function resetRouteGraphics(state) {
+        state = state || getRouteState();
+        state.mule.visible = false;
+        routeCurrentNodeIdx = 0;
+        var p = pathProgressFromNodeIndex(0, state);
+        updateRouteAnimationFrame(p, p, state);
+        highlightRouteNodeMarker(0, state);
+        state.start.geometry = new Point({
+          longitude: state.path[0][0],
+          latitude: state.path[0][1]
+        });
+        state.start.symbol = state.mode === ROUTE_MODE_MODERN ? {
+          type: "simple-marker",
+          style: "triangle",
+          color: ROUTE_GREEN,
+          size: 10,
+          angle: 45,
+          outline: { color: ROUTE_GREEN_OUTLINE, width: 1.5 }
+        } : {
+          type: "simple-marker",
+          style: "triangle",
+          color: ROUTE_YELLOW,
+          size: 10,
+          angle: 45,
+          outline: { color: ROUTE_YELLOW_OUTLINE_DARK, width: 1.5 }
+        };
+      }
+
+      function setRouteLayersVisible(mode) {
+        routeLayer.visible = mode === ROUTE_MODE_ANCIENT;
+        routeNodeLayer.visible = mode === ROUTE_MODE_ANCIENT;
+        modernRouteLayer.visible = mode === ROUTE_MODE_MODERN;
+        modernRouteNodeLayer.visible = mode === ROUTE_MODE_MODERN;
+      }
+
+      function clearRouteTimers() {
+        if (routeAnimFrameId) {
+          cancelAnimationFrame(routeAnimFrameId);
+          routeAnimFrameId = null;
+        }
+        if (routePauseTimer) {
+          clearTimeout(routePauseTimer);
+          routePauseTimer = null;
+        }
+        if (routeLoopTimer) {
+          clearTimeout(routeLoopTimer);
+          routeLoopTimer = null;
+        }
+      }
+
+      function scheduleRoutePauseThen(nextFn) {
+        routePauseTimer = setTimeout(function () {
+          routePauseTimer = null;
+          if (!routeAnimRunning) return;
+          view.closePopup();
+          routeLoopTimer = setTimeout(function () {
+            routeLoopTimer = null;
+            if (!routeAnimRunning) return;
+            nextFn();
+          }, Math.max(0, ROUTE_POPUP_CLOSE_MS - ROUTE_NODE_STOP_MS));
+        }, ROUTE_NODE_STOP_MS);
+      }
+
+      function arriveAtRouteNode(nodeIdx) {
+        if (!routeAnimRunning) return;
+        var state = getRouteState();
+        routeCurrentNodeIdx = nodeIdx;
+        var node = state.nodes[nodeIdx];
+        var p = pathProgressFromNodeIndex(nodeIdx, state);
+        updateRouteAnimationFrame(p, p, state);
+        highlightRouteNodeMarker(nodeIdx, state);
+        showRouteNodePopup(node, state);
+
+        if (nodeIdx >= state.nodes.length - 1) {
+          scheduleRoutePauseThen(function () {
+            routeLoopTimer = setTimeout(function () {
+              routeLoopTimer = null;
+              if (!routeAnimRunning) return;
+              resetRouteGraphics(state);
+              arriveAtRouteNode(0);
+            }, ROUTE_LOOP_GAP_MS);
+          });
+          return;
+        }
+
+        scheduleRoutePauseThen(function () {
+          travelBetweenRouteNodes(nodeIdx, nodeIdx + 1);
+        });
+      }
+
+      function travelBetweenRouteNodes(fromIdx, toIdx) {
+        if (!routeAnimRunning) return;
+        var state = getRouteState();
+        var segStart = performance.now();
+
+        function tick(now) {
+          if (!routeAnimRunning) return;
+          var elapsed = now - segStart;
+          var frac = Math.min(1, elapsed / state.travelMs);
+          var prog = pathProgressBetweenNodes(fromIdx, toIdx, frac, state);
+          updateRouteAnimationFrame(prog, prog, state);
+          if (frac < 1) {
+            routeAnimFrameId = requestAnimationFrame(tick);
+          } else {
+            routeAnimFrameId = null;
+            arriveAtRouteNode(toIdx);
+          }
+        }
+
+        routeAnimFrameId = requestAnimationFrame(tick);
+      }
+
+      function updateRouteModeButtons() {
+        if (!routeModeToggle) return;
+        var buttons = routeModeToggle.querySelectorAll(".route-mode-btn");
+        buttons.forEach(function (btn) {
+          btn.classList.toggle("active", btn.dataset.mode === currentRouteMode);
+        });
+      }
+
+      function updateRouteComparePanel() {
+        if (!routeComparePanel || !routeCompareTitle || !routeCompareText) return;
+        var copy = ROUTE_COMPARE_COPY[currentRouteMode] || ROUTE_COMPARE_COPY.ancient;
+        routeCompareTitle.textContent = copy.title;
+        routeCompareText.textContent = copy.text;
+        routeComparePanel.classList.remove("mode-ancient", "mode-modern");
+        routeComparePanel.classList.add(currentRouteMode === ROUTE_MODE_MODERN ? "mode-modern" : "mode-ancient");
+      }
+
+      var dataMapEnrich = document.getElementById("dataMapEnrich");
+
+      function setDataMapEnrich(active) {
+        if (dataMapEnrich) {
+          dataMapEnrich.classList.toggle("open", active);
+          dataMapEnrich.setAttribute("aria-hidden", active ? "false" : "true");
+        }
+        if (dataEnrichLayer) {
+          dataEnrichLayer.visible = active;
+        }
+        if (!active && view) {
+          view.closePopup();
+        }
+      }
+
+      function setRouteModeUI(visible) {
+        if (routeModeToggle) {
+          routeModeToggle.classList.toggle("visible", visible);
+        }
+        if (routeComparePanel) {
+          if (visible && !routeComparePanelClosed) {
+            routeComparePanel.classList.add("open");
+            routeComparePanel.setAttribute("aria-hidden", "false");
+          } else if (!visible) {
+            routeComparePanel.classList.remove("open");
+            routeComparePanel.setAttribute("aria-hidden", "true");
+          }
+        }
+      }
+
+      function positionRouteMapBubble() {
+        if (!routeMapBubble) return;
+        var dock = document.getElementById("mapTopLeftDock");
+        var wrap = document.getElementById("mapWrap");
+        if (!dock || !wrap) return;
+        var dr = dock.getBoundingClientRect();
+        var wr = wrap.getBoundingClientRect();
+        routeMapBubble.style.top = Math.round(dr.bottom - wr.top + 8) + "px";
+        routeMapBubble.style.left = Math.round(dr.left - wr.left) + "px";
+      }
+
+      function setRouteMapBubble(open) {
+        if (!routeMapBubble) return;
+        if (open) positionRouteMapBubble();
+        routeMapBubble.classList.toggle("open", open);
+        routeMapBubble.setAttribute("aria-hidden", open ? "false" : "true");
+      }
+
+      function switchRouteMode(mode) {
+        if (mode !== ROUTE_MODE_ANCIENT && mode !== ROUTE_MODE_MODERN) return;
+        if (mode === currentRouteMode && routeAnimRunning) return;
+        currentRouteMode = mode;
+        routeStateAncient.path = ANCIENT_TRAVEL_PATH;
+        routeStateAncient.nodePathIdx = ROUTE_NODE_PATH_IDX;
+        routeStateModern.path = MODERN_TRAVEL_PATH;
+        routeStateModern.nodePathIdx = MODERN_NODE_PATH_IDX;
+        routeStateModern.nodes = MODERN_ROUTE_NODES;
+        syncModernRouteBgGeometry();
+        updateRouteModeButtons();
+        updateRouteComparePanel();
+        startRouteAnimation();
+      }
+
+      function startRouteAnimation() {
+        stopRouteAnimation(false);
+        routeAnimRunning = true;
+        currentRouteMode = currentRouteMode || ROUTE_MODE_ANCIENT;
+        routeStateAncient.path = ANCIENT_TRAVEL_PATH;
+        routeStateModern.path = MODERN_TRAVEL_PATH;
+        routeStateModern.nodePathIdx = MODERN_NODE_PATH_IDX;
+        routeStateModern.nodes = MODERN_ROUTE_NODES;
+        syncModernRouteBgGeometry();
+        setRouteLayersVisible(currentRouteMode);
+        setRouteModeUI(true);
+        updateRouteModeButtons();
+        updateRouteComparePanel();
+        setRouteMapBubble(true);
+        var state = getRouteState();
+        state.mule.visible = false;
+        resetRouteGraphics(state);
+        arriveAtRouteNode(0);
+      }
+
+      function stopRouteAnimation(hideUi) {
+        if (hideUi !== false) hideUi = true;
+        routeAnimRunning = false;
+        clearRouteTimers();
+        if (view) view.closePopup();
+        routeLayer.visible = false;
+        routeNodeLayer.visible = false;
+        modernRouteLayer.visible = false;
+        modernRouteNodeLayer.visible = false;
+        if (hideUi) {
+          setRouteMapBubble(false);
+          setRouteModeUI(false);
+        }
+      }
+
+      if (routeModeToggle) {
+        routeModeToggle.addEventListener("click", function (e) {
+          var btn = e.target.closest(".route-mode-btn");
+          if (!btn || !routeAnimRunning) return;
+          switchRouteMode(btn.dataset.mode);
+        });
+      }
+
+      if (btnRouteCompareClose) {
+        btnRouteCompareClose.addEventListener("click", function () {
+          routeComparePanelClosed = true;
+          if (routeComparePanel) {
+            routeComparePanel.classList.remove("open");
+            routeComparePanel.setAttribute("aria-hidden", "true");
+          }
+        });
+      }
+
+      function rgbToCss(rgb) {
+        return "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+      }
+
+      function getViewpointOrderColor(orderIdx) {
+        return VIEWPOINT_ORDER_COLORS[orderIdx] || VIEWPOINT_ORDER_COLORS[0];
+      }
+
+      function getViewpointMarkerSymbol(orderIdx, role) {
+        var rgb = getViewpointOrderColor(orderIdx);
+        var size = 12;
+        var alpha = 0.88;
+        var outlineW = 2;
+        var outlineRgb = [255, 255, 255];
+
+        if (role === "active") {
+          size = 20;
+          alpha = 1;
+          outlineW = 3;
+          outlineRgb = rgb;
+        } else if (role === "visited") {
+          size = 14;
+          alpha = 0.95;
+          outlineW = 2.2;
+        } else if (role === "upcoming") {
+          size = 11;
+          alpha = 0.62;
+          outlineW = 1.8;
+          outlineRgb = [
+            Math.round(rgb[0] * 0.55 + 120),
+            Math.round(rgb[1] * 0.55 + 120),
+            Math.round(rgb[2] * 0.55 + 120)
+          ];
+        }
+
+        return {
+          type: "simple-marker",
+          style: "circle",
+          color: [rgb[0], rgb[1], rgb[2], alpha],
+          size: size,
+          outline: { color: outlineRgb, width: outlineW }
+        };
+      }
+
+      function getViewpointMarkerRole(orderIdx, highlightIdx, visitedSet) {
+        if (highlightIdx === orderIdx) return "active";
+        if (visitedSet && visitedSet[orderIdx]) return "visited";
+        return "upcoming";
+      }
+
+      function createViewpointGraphic(vp, i, highlightIdx, visitedSet) {
+        var role = getViewpointMarkerRole(i, highlightIdx, visitedSet);
+        return new Graphic({
+          geometry: new Point({ longitude: vp.lon, latitude: vp.lat }),
+          symbol: getViewpointMarkerSymbol(i, role),
+          attributes: {
+            idx: i,
+            order: i + 1,
+            name: vp.name,
+            tip: vp.tip,
+            image: vp.image || ""
+          },
+          popupTemplate: {
+            title: "第{order}站 · {name}",
+            content: function (feature) {
+              return buildDataMarkerPopupHtml(feature.graphic.attributes);
+            }
+          }
+        });
+      }
+
+      function initViewpointGraphics() {
+        viewpointGraphics = VIEWPOINTS.map(function (vp, i) {
+          return createViewpointGraphic(vp, i, null, {});
+        });
+        viewpointLayer.addMany(viewpointGraphics);
+      }
+
+      function updateViewpointGraphics(highlightIdx, visitedSet) {
+        if (!viewpointGraphics.length) {
+          initViewpointGraphics();
+          return;
+        }
+        viewpointGraphics.forEach(function (g, i) {
+          var role = getViewpointMarkerRole(i, highlightIdx, visitedSet);
+          g.symbol = getViewpointMarkerSymbol(i, role);
+        });
+      }
+
+      var visitedViewpoints = {};
+
+      initViewpointGraphics();
+
+      var map = new Map({
+        basemap: DEFAULT_BASEMAP,
+        ground: new Ground({ layers: [] }),
+        layers: [viewpointLayer, dataEnrichLayer, routeLayer, routeNodeLayer, modernRouteLayer, modernRouteNodeLayer]
+      });
+
+      boundaryLayer.load().then(function () {
+        map.add(boundaryLayer, 0);
+      });
+
+      var view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: GUIZHOU_CENTER,
+        scale: GUIZHOU_SCALE,
+        padding: { top: 12, bottom: 12, left: 12, right: 12 },
+        qualityProfile: "performance",
+        constraints: { snapToZoom: false }
+      });
+
+      view.ui.padding = { top: 8, bottom: 20, left: 8, right: 8 };
+
+      new ScaleBar({
+        view: view,
+        unit: "metric",
+        container: document.getElementById("scaleBarSlot")
+      });
+      var guizhouHomeViewpoint = {
+        center: GUIZHOU_CENTER,
+        scale: GUIZHOU_SCALE,
+        tilt: 0,
+        heading: 0
+      };
+      new Home({
+        view: view,
+        container: document.getElementById("homeBtnSlot"),
+        viewpoint: guizhouHomeViewpoint
+      });
+      new Zoom({
+        view: view,
+        container: document.getElementById("zoomBtnSlot")
+      });
+      view.ui.add(new Compass({ view: view }), "bottom-right");
+
+      var elCoordLon = document.getElementById("coordLon");
+      var elCoordLat = document.getElementById("coordLat");
+
+      function setCoordDisplay(lon, lat) {
+        elCoordLon.textContent = lon != null ? lon.toFixed(4) : "—";
+        elCoordLat.textContent = lat != null ? lat.toFixed(4) : "—";
+      }
+
+      view.on("pointer-move", function (evt) {
+        var mapPoint = view.toMap(evt);
+        if (mapPoint && isFinite(mapPoint.longitude) && isFinite(mapPoint.latitude)) {
+          setCoordDisplay(mapPoint.longitude, mapPoint.latitude);
+        }
+      });
+
+      view.on("pointer-leave", function () {
+        setCoordDisplay(null, null);
+      });
+
+      var overviewBoundaryLayer = new FeatureLayer({
+        url: BOUNDARY_URL,
+        title: "副图省界",
+        outFields: [],
+        popupEnabled: false,
+        opacity: 0.85,
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "simple-fill",
+            color: [92, 109, 126, 0.14],
+            outline: { color: [61, 90, 120, 1], width: 1.2 }
+          }
+        }
+      });
+
+      var overviewExtentLayer = new GraphicsLayer({ title: "主图范围框", listMode: "hide" });
+
+      var overviewMap = new Map({
+        basemap: BASEMAP_STREETS,
+        ground: new Ground({ layers: [] }),
+        layers: [overviewBoundaryLayer, overviewExtentLayer]
+      });
+
+      var overviewExtentGraphic = new Graphic({
+        symbol: {
+          type: "simple-fill",
+          color: [184, 92, 56, 0.2],
+          outline: { color: [184, 92, 56, 1], width: 2 }
+        }
+      });
+      overviewExtentLayer.add(overviewExtentGraphic);
+
+      var overviewView = new MapView({
+        container: "overviewViewDiv",
+        map: overviewMap,
+        center: GUIZHOU_CENTER,
+        scale: GUIZHOU_SCALE,
+        ui: { components: [] },
+        constraints: { rotationEnabled: false },
+        navigation: {
+          mouseWheelZoomEnabled: false,
+          browserTouchPanEnabled: false
+        },
+        popupEnabled: false,
+        qualityProfile: "performance"
+      });
+
+      var extentSyncScheduled = false;
+      var overviewMapReady = false;
+      var projectionReady = false;
+
+      function ensureProjectionReady() {
+        if (projectionReady) return Promise.resolve();
+        return projection.load().then(function () {
+          projectionReady = true;
+        });
+      }
+
+      function updateOverviewExtentBox() {
+        if (!view.extent || !overviewView.ready || !overviewMapReady) return;
+
+        ensureProjectionReady().then(function () {
+          var mainExt = view.extent.clone();
+          var oSr = overviewView.spatialReference;
+          var geom = mainExt;
+
+          if (
+            mainExt.spatialReference &&
+            oSr &&
+            mainExt.spatialReference.wkid !== oSr.wkid
+          ) {
+            var projected = projection.project(mainExt, oSr);
+            if (projected) {
+              geom = Array.isArray(projected) ? projected[0] : projected;
+            }
+          }
+
+          if (geom) {
+            overviewExtentGraphic.geometry = geom;
+          }
+        }).catch(function () {
+          if (view.extent) {
+            overviewExtentGraphic.geometry = view.extent.clone();
+          }
+        });
+      }
+
+      function scheduleOverviewExtentSync() {
+        if (extentSyncScheduled) return;
+        extentSyncScheduled = true;
+        requestAnimationFrame(function () {
+          extentSyncScheduled = false;
+          updateOverviewExtentBox();
+        });
+      }
+
+      function bindOverviewExtentSync() {
+        view.watch("extent", scheduleOverviewExtentSync);
+        view.watch("rotation", scheduleOverviewExtentSync);
+        view.watch("scale", scheduleOverviewExtentSync);
+        view.watch("center", scheduleOverviewExtentSync);
+        view.watch("stationary", function (stationary) {
+          if (stationary) scheduleOverviewExtentSync();
+        });
+        view.watch("animating", function (animating) {
+          if (animating) scheduleOverviewExtentSync();
+        });
+        view.watch("padding", scheduleOverviewExtentSync);
+        overviewView.watch("width", scheduleOverviewExtentSync);
+        overviewView.watch("height", scheduleOverviewExtentSync);
+        overviewView.watch("stationary", function (stationary) {
+          if (stationary) scheduleOverviewExtentSync();
+        });
+      }
+
+      function initOverviewMap() {
+        overviewBoundaryLayer.load();
+        overviewView.when(function () {
+          return overviewView.goTo(GUIZHOU_OVERVIEW_EXTENT, { animate: false });
+        }).then(function () {
+          overviewMapReady = true;
+          return view.when();
+        }).then(function () {
+          scheduleOverviewExtentSync();
+        });
+        bindOverviewExtentSync();
+
+        if (window.ResizeObserver && document.getElementById("overviewMapWrap")) {
+          var overviewResizeObs = new ResizeObserver(function () {
+            scheduleOverviewExtentSync();
+          });
+          overviewResizeObs.observe(document.getElementById("overviewMapWrap"));
+        }
+      }
+
+      var currentIndex = -1;
+      var viewReady = false;
+      var isFlying = false;
+      var viewpointGraphics = [];
+      var mapJumpPromise = null;
+      var mapWrap = document.getElementById("mapWrap");
+      var morePanelWidth = null;
+
+      var el = {
+        stepNav: document.getElementById("stepNav"),
+        storyBody: document.getElementById("storyBody"),
+        progressFill: document.getElementById("progressFill"),
+        mapBadge: document.getElementById("mapBadge"),
+        mapMorePanel: document.getElementById("mapMorePanel"),
+        mapMoreResize: document.getElementById("mapMoreResize"),
+        mapMoreContent: document.getElementById("mapMoreContent"),
+        btnCloseMore: document.getElementById("btnCloseMore"),
+        btnPrev: document.getElementById("btnPrev"),
+        btnNext: document.getElementById("btnNext"),
+        basemapSelect: document.getElementById("basemapSelect")
+      };
+
+      function buildTableHtml(rows, caption) {
+        var h = '<table class="info-table"><thead><tr><th>项目</th><th>内容</th></tr></thead><tbody>';
+        rows.forEach(function (r) {
+          h += "<tr><td>" + r.label + '</td><td class="val">' + r.value + "</td></tr>";
+        });
+        h += "</tbody></table>";
+        if (caption) {
+          h = '<p style="font-size:0.72rem;color:var(--muted);margin-bottom:8px">' + caption + "</p>" + h;
+        }
+        return h;
+      }
+
+      function renderBasicTableWrap() {
+        var html = '<div class="info-table-wrap"><div class="info-table-inner">';
+        html += buildTableHtml(GUIZHOU_BASIC, "");
+        html += "</div></div>";
+        html += '<button type="button" class="btn-more" id="btnShowMore">查看更多贵州信息 <i class="fa-solid fa-arrow-right"></i></button>';
+        return html;
+      }
+
+      function renderMapMorePanel() {
+        var html = '<div class="more-v-stack" role="list">';
+        GUIZHOU_MORE.forEach(function (sec) {
+          html += '<article class="more-section-card" role="listitem">';
+          html += '<div class="section-title">' + sec.title + "</div>";
+          html += '<dl class="kv-list">';
+          sec.rows.forEach(function (r) {
+            html += '<div class="kv-row"><dt>' + r.label + "</dt><dd>" + r.value + "</dd></div>";
+          });
+          html += "</dl></article>";
+        });
+        html += "</div>";
+        el.mapMoreContent.innerHTML = html;
+      }
+
+      function getOptimalMorePanelWidth() {
+        var mw = mapWrap ? mapWrap.clientWidth : 800;
+        return Math.round(Math.min(420, Math.max(300, mw * 0.32)));
+      }
+
+      function applyMorePanelWidth(w, persist) {
+        var maxW = mapWrap ? mapWrap.clientWidth - 40 : 600;
+        w = Math.max(240, Math.min(maxW, Math.round(w)));
+        morePanelWidth = w;
+        el.mapMorePanel.style.setProperty("--more-panel-w", w + "px");
+        el.mapMorePanel.style.width = w + "px";
+        if (persist) {
+          try { localStorage.setItem("gzMorePanelW", String(w)); } catch (e) { /* ignore */ }
+        }
+        applyViewPadding();
+      }
+
+      function initMorePanelWidth() {
+        var saved = null;
+        try { saved = parseInt(localStorage.getItem("gzMorePanelW"), 10); } catch (e) { /* ignore */ }
+        if (saved && saved >= 240) {
+          applyMorePanelWidth(saved, false);
+        } else {
+          applyMorePanelWidth(getOptimalMorePanelWidth(), false);
+        }
+      }
+
+      function getMapDockPadding() {
+        var dock = document.getElementById("mapCornerDock");
+        var w = dock ? dock.offsetWidth : 200;
+        var h = dock ? dock.offsetHeight : 228;
+        return {
+          left: w + 20,
+          bottom: h + 16
+        };
+      }
+
+      function applyViewPadding() {
+        if (!view) return;
+        var step = currentIndex >= 0 ? STEPS[currentIndex] : null;
+        if (step && isPointStep(step)) {
+          usePointStepViewPadding();
+          scheduleOverviewExtentSync();
+          return;
+        }
+        var rightPad = 12;
+        if (el.mapMorePanel.classList.contains("open")) {
+          rightPad = (el.mapMorePanel.offsetWidth || morePanelWidth || 320) + 24;
+        }
+        var dockPad = getMapDockPadding();
+        view.padding = {
+          top: 12,
+          bottom: dockPad.bottom,
+          left: dockPad.left,
+          right: rightPad
+        };
+        scheduleOverviewExtentSync();
+      }
+
+      function setMapMoreOpen(open) {
+        el.mapMorePanel.classList.toggle("open", open);
+        el.mapMorePanel.setAttribute("aria-hidden", open ? "false" : "true");
+        if (open && morePanelWidth == null) {
+          initMorePanelWidth();
+        }
+        if (open) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(applyViewPadding);
+          });
+        } else {
+          applyViewPadding();
+        }
+      }
+
+      function initMorePanelResize() {
+        var dragging = false;
+        var startX = 0;
+        var startW = 0;
+
+        function onMove(e) {
+          if (!dragging) return;
+          var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          var delta = startX - clientX;
+          applyMorePanelWidth(startW + delta, false);
+        }
+
+        function onEnd() {
+          if (!dragging) return;
+          dragging = false;
+          el.mapMorePanel.classList.remove("resizing");
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+          applyMorePanelWidth(morePanelWidth, true);
+        }
+
+        el.mapMoreResize.addEventListener("mousedown", function (e) {
+          if (!el.mapMorePanel.classList.contains("open")) return;
+          dragging = true;
+          startX = e.clientX;
+          startW = el.mapMorePanel.offsetWidth;
+          el.mapMorePanel.classList.add("resizing");
+          document.body.style.cursor = "ew-resize";
+          document.body.style.userSelect = "none";
+          e.preventDefault();
+        });
+
+        el.mapMoreResize.addEventListener("touchstart", function (e) {
+          if (!el.mapMorePanel.classList.contains("open")) return;
+          dragging = true;
+          startX = e.touches[0].clientX;
+          startW = el.mapMorePanel.offsetWidth;
+          el.mapMorePanel.classList.add("resizing");
+          e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onEnd);
+        document.addEventListener("touchmove", onMove, { passive: true });
+        document.addEventListener("touchend", onEnd);
+
+        window.addEventListener("resize", function () {
+          if (morePanelWidth != null) {
+            applyMorePanelWidth(morePanelWidth, false);
+          }
+          applyViewPadding();
+          if (routeMapBubble && routeMapBubble.classList.contains("open")) {
+            positionRouteMapBubble();
+          }
+        });
+      }
+
+      function bindShowMoreButton() {
+        var btnMore = document.getElementById("btnShowMore");
+        if (btnMore) {
+          btnMore.addEventListener("click", function () {
+            if (morePanelWidth == null) initMorePanelWidth();
+            setMapMoreOpen(true);
+          });
+        }
+      }
+
+      function paintStoryPanel(step, index) {
+        el.storyBody.classList.remove("is-initial");
+        el.storyBody.innerHTML = renderStoryHtml(step);
+        requestAnimationFrame(function () {
+          var block = el.storyBody.querySelector(".story-block");
+          if (block) block.classList.add("visible");
+          bindShowMoreButton();
+        });
+        updateStepNav(index);
+        el.progressFill.style.width = ((index + 1) / STEPS.length * 100) + "%";
+        el.btnPrev.disabled = index === 0;
+        el.btnNext.disabled = index === STEPS.length - 1;
+        el.btnNext.innerHTML = index === STEPS.length - 1
+          ? "本章结束 <i class='fa-solid fa-flag-checkered'></i>"
+          : "下一步 <i class='fa-solid fa-chevron-right'></i>";
+      }
+
+      function initStoryOnLoad() {
+        paintStoryPanel(STEPS[0], 0);
+      }
+
+      function getStepPillColor(stepIndex) {
+        var hi = STEP_HIGHLIGHT_INDEX[stepIndex];
+        if (hi < 0) return null;
+        return rgbToCss(getViewpointOrderColor(hi));
+      }
+
+      function buildStepNav() {
+        STEPS.forEach(function (step, i) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "step-pill";
+          btn.dataset.index = String(i);
+          var pillColor = getStepPillColor(i);
+          if (pillColor) {
+            btn.classList.add("has-order");
+            btn.style.setProperty("--pill-color", pillColor);
+            btn.setAttribute("aria-label", "第 " + (STEP_HIGHLIGHT_INDEX[i] + 1) + " 站 · " + step.pill);
+          } else {
+            btn.setAttribute("aria-label", step.pill);
+          }
+          if (step.id === "oldroute") {
+            btn.classList.add("route-pill");
+          }
+          btn.innerHTML =
+            '<span class="num">' + (i + 1) + '</span><span class="lbl">' + step.pill + "</span>";
+          btn.addEventListener("click", function () {
+            goToStep(i);
+          });
+          el.stepNav.appendChild(btn);
+        });
+      }
+
+      function renderGeoFiguresHtml(figures) {
+        if (!figures || !figures.length) return "";
+        var html = '<section class="story-geo-panel" aria-label="GIS 地貌图解">';
+        html += '<h3 class="section-subtitle">GIS 地貌数据解译</h3>';
+        html += '<div class="story-geo-grid">';
+        figures.forEach(function (fig) {
+          html += '<article class="story-geo-card">';
+          html += '<img src="' + fig.src + '" alt="' + (fig.title || fig.caption || "") + '" loading="lazy"/>';
+          html += '<p class="geo-cap">' + fig.caption + "</p>";
+          html += '<p class="geo-desc">' + fig.desc + "</p>";
+          html += "</article>";
+        });
+        html += "</div></section>";
+        return html;
+      }
+
+      function renderStoryHtml(step) {
+        var html = '<div class="story-block visible' + (step.layout === "data-story" ? " story-data-layout" : "") + '">';
+        html += '<div class="step-badge">' + step.badge + "</div>";
+        html += '<h2 class="step-title">' + step.title + "</h2>";
+
+        if (step.layout === "data-story") {
+          if (step.lead) {
+            html += '<div class="story-lead">' + step.lead + "</div>";
+          }
+          if (step.dataCards && step.dataCards.length) {
+            html += '<div class="data-cards">';
+            step.dataCards.forEach(function (c) {
+              html += '<div class="data-card"><strong>' + c.value + "</strong><span>" + c.label + "</span></div>";
+            });
+            html += "</div>";
+          }
+          if (step.geoFigures && step.geoFigures.length) {
+            html += renderGeoFiguresHtml(step.geoFigures);
+          }
+          if (step.image) {
+            html += '<figure class="story-figure"><img src="' + step.image + '" alt="' + (step.caption || step.pill || "") +
+              '" loading="lazy"/><figcaption>' + (step.caption || step.pill || "") + "</figcaption></figure>";
+          }
+          if (step.body && step.body.length) {
+            html += '<div class="step-text">' + step.body.join("") + "</div>";
+          }
+          if (step.sections && step.sections.length) {
+            step.sections.forEach(function (sec) {
+              html += '<section class="story-data-section">';
+              html += '<h3 class="section-subtitle">' + sec.title + "</h3>";
+              html += '<div class="section-body">';
+              sec.paragraphs.forEach(function (para) {
+                html += "<p>" + para + "</p>";
+              });
+              html += "</div></section>";
+            });
+          }
+          if (step.mapHint) {
+            html += '<div class="story-data-highlight"><strong>地图阅读提示：</strong>' + step.mapHint + "</div>";
+          }
+          if (step.meta) {
+            html += '<div class="step-meta">' + step.meta + "</div>";
+          }
+        } else {
+          if (step.image) {
+            html += '<figure class="story-figure"><img src="' + step.image + '" alt="' + (step.caption || step.pill || "") +
+              '" loading="lazy"/><figcaption>' + (step.caption || step.pill || "") + "</figcaption></figure>";
+          }
+          html += '<div class="step-text">' + (step.body ? step.body.join("") : "") + "</div>";
+          if (step.showBasicTable) {
+            html += renderBasicTableWrap();
+          }
+          if (step.dataCards) {
+            html += '<div class="data-cards">';
+            step.dataCards.forEach(function (c) {
+              html += '<div class="data-card"><strong>' + c.value + "</strong><span>" + c.label + "</span></div>";
+            });
+            html += "</div>";
+          }
+          if (step.meta) {
+            html += '<div class="step-meta">' + step.meta + "</div>";
+          }
+        }
+
+        html += "</div>";
+        return html;
+      }
+
+      function scrollTagIntoView(container, activeEl) {
+        if (!container || !activeEl) return;
+        var left = activeEl.offsetLeft - container.clientWidth / 2 + activeEl.offsetWidth / 2;
+        container.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+      }
+
+      function getNarrativeProgressIndex(stepIndex) {
+        var hi = STEP_HIGHLIGHT_INDEX[stepIndex];
+        if (hi >= 0) return hi;
+        if (stepIndex === 0) return -1;
+        if (STEPS[stepIndex].id === "oldroute") return -1;
+        if (stepIndex >= DATA_STEP_INDEX) return NARRATIVE_STOP_COUNT;
+        return -1;
+      }
+
+      function updateStepNav(index) {
+        var pills = el.stepNav.querySelectorAll(".step-pill");
+        var narrativePos = getNarrativeProgressIndex(index);
+
+        pills.forEach(function (pill, i) {
+          var hi = STEP_HIGHLIGHT_INDEX[i];
+          var isActive = i === index;
+          var isDone = false;
+          var isUpcoming = false;
+
+          pill.classList.toggle("active", isActive);
+
+          if (hi >= 0) {
+            if (narrativePos < 0) {
+              isUpcoming = true;
+            } else if (hi < narrativePos) {
+              isDone = true;
+            } else if (hi > narrativePos) {
+              isUpcoming = true;
+            } else if (!isActive) {
+              isDone = true;
+            }
+          } else if (i < index) {
+            isDone = true;
+          }
+
+          pill.classList.toggle("done", isDone);
+          pill.classList.toggle("upcoming", isUpcoming && !isActive);
+        });
+        scrollTagIntoView(el.stepNav, pills[index]);
+      }
+
+      function markVisitedViewpoints(step) {
+        if (step.highlight != null) {
+          visitedViewpoints[step.highlight] = true;
+        }
+      }
+
+      function updateViewpoints(highlightIdx) {
+        updateViewpointGraphics(highlightIdx, visitedViewpoints);
+      }
+
+      function isPointStep(step) {
+        return step.highlight != null;
+      }
+
+      /* 标签 2–8：跳转时对称 padding，便于把标注点对准地图几何中心（宽 1/2、高 1/2） */
+      var POINT_STEP_SYM_PADDING = { top: 12, bottom: 12, left: 12, right: 12 };
+
+      function usePointStepViewPadding() {
+        if (view) view.padding = POINT_STEP_SYM_PADDING;
+      }
+
+      function getPointStepCenter(step) {
+        var idx = step.highlight;
+        if (idx != null && VIEWPOINTS[idx]) {
+          return [VIEWPOINTS[idx].lon, VIEWPOINTS[idx].lat];
+        }
+        return step.center;
+      }
+
+      function centerMarkerAtMapHalf(step) {
+        var idx = step.highlight;
+        if (idx == null || !view || !VIEWPOINTS[idx]) {
+          return Promise.resolve();
+        }
+        var vp = VIEWPOINTS[idx];
+        var pt = new Point({ longitude: vp.lon, latitude: vp.lat });
+        var halfX = view.width / 2;
+        var halfY = view.height / 2;
+        var sp = view.toScreen(pt);
+        if (!sp || !view.center) return Promise.resolve();
+        var dx = halfX - sp.x;
+        var dy = halfY - sp.y;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return Promise.resolve();
+        var centerSp = view.toScreen(view.center);
+        if (!centerSp) return Promise.resolve();
+        var newCenter = view.toMap({ x: centerSp.x - dx, y: centerSp.y - dy });
+        if (!newCenter) return Promise.resolve();
+        return view.goTo(
+          {
+            center: newCenter,
+            zoom: view.zoom,
+            tilt: view.tilt,
+            heading: view.heading
+          },
+          { animate: false }
+        );
+      }
+
+      function shouldFlyToStep(step) {
+        return isPointStep(step) || step.animateView === true;
+      }
+
+      function getStepFlyOptions(step, prevIndex) {
+        if (
+          step.showRouteAnim &&
+          prevIndex >= 0 &&
+          STEPS[prevIndex] &&
+          STEPS[prevIndex].highlight != null
+        ) {
+          return ROUTE_STEP_FLY_OPTS;
+        }
+        if (step.animateView) {
+          return ROUTE_STEP_FLY_OPTS;
+        }
+        return MAP_FLY_OPTS;
+      }
+
+      function resolveBasemap(key) {
+        return BASEMAP_LOOKUP[key] || key;
+      }
+
+      function getStepBasemapKey(stepIndex) {
+        return stepIndex === DATA_STEP_INDEX || STEPS[stepIndex].id === "data"
+          ? "terrain-relief"
+          : BASEMAP_STREETS;
+      }
+
+      function applyStepBasemap(stepIndex) {
+        var key = getStepBasemapKey(stepIndex);
+        map.basemap = resolveBasemap(key);
+        overviewMap.basemap = resolveBasemap(key);
+        el.basemapSelect.value = key;
+      }
+
+      function getStepGoToTarget(step) {
+        if (step.id === "oldroute" && ANCIENT_TRAVEL_PATH.length) {
+          var routeExt = getRoutePathExtent(1.42);
+          if (routeExt) {
+            return {
+              target: routeExt,
+              tilt: step.tilt != null ? step.tilt : 0,
+              heading: 0
+            };
+          }
+        }
+        if (step.provinceView) {
+          return {
+            center: GUIZHOU_CENTER,
+            scale: GUIZHOU_SCALE,
+            tilt: step.tilt != null ? step.tilt : 0,
+            heading: 0
+          };
+        }
+        return {
+          center: getPointStepCenter(step),
+          zoom: step.zoom,
+          tilt: step.tilt || 0,
+          heading: 0
+        };
+      }
+
+      function finishPointStepViewAlign(step) {
+        return centerMarkerAtMapHalf(step).then(function () {
+          usePointStepViewPadding();
+          scheduleOverviewExtentSync();
+        });
+      }
+
+      function setViewToStepInstant(step) {
+        if (view.animation) {
+          view.animation.stop();
+        }
+        var isPoint = isPointStep(step);
+        if (isPoint) usePointStepViewPadding();
+        var t = getStepGoToTarget(step);
+        var done = function () {
+          el.mapBadge.innerHTML = "<strong>当前视点</strong> · " + step.mapLabel;
+          if (isPoint) {
+            return finishPointStepViewAlign(step);
+          }
+          scheduleOverviewExtentSync();
+          return Promise.resolve();
+        };
+        if (t.target) {
+          return view.goTo(t, { animate: false }).then(done);
+        }
+        view.center = t.center;
+        if (t.scale != null) {
+          view.scale = t.scale;
+        } else if (t.zoom != null) {
+          view.zoom = t.zoom;
+        }
+        view.tilt = t.tilt;
+        view.heading = t.heading;
+        return done();
+      }
+
+      function flyToStep(step, prevIndex) {
+        if (!shouldFlyToStep(step)) {
+          isFlying = false;
+          return setViewToStepInstant(step);
+        }
+        isFlying = true;
+        el.mapBadge.innerHTML = "<strong>飞行中</strong> · " + step.mapLabel;
+        if (mapJumpPromise && mapJumpPromise.abort) {
+          mapJumpPromise.abort();
+        }
+        if (isPointStep(step)) usePointStepViewPadding();
+        mapJumpPromise = view.goTo(
+          getStepGoToTarget(step),
+          getStepFlyOptions(step, prevIndex != null ? prevIndex : -1)
+        );
+        return mapJumpPromise
+          .then(function () {
+            var afterAlign = function () {
+              isFlying = false;
+              el.mapBadge.innerHTML = "<strong>当前视点</strong> · " + step.mapLabel;
+            };
+            if (isPointStep(step)) {
+              return finishPointStepViewAlign(step).then(afterAlign);
+            }
+            applyViewPadding();
+            afterAlign();
+            scheduleOverviewExtentSync();
+          })
+          .catch(function () {
+            isFlying = false;
+            applyViewPadding();
+            scheduleOverviewExtentSync();
+          });
+      }
+
+      function openStepPopup(step) {
+        if (step.highlight != null && viewpointGraphics[step.highlight]) {
+          view.openPopup({
+            features: [viewpointGraphics[step.highlight]],
+            location: viewpointGraphics[step.highlight].geometry
+          });
+        } else {
+          view.closePopup();
+        }
+      }
+
+      function goToStep(index) {
+        index = Math.max(0, Math.min(STEPS.length - 1, index));
+        if (!viewReady) {
+          view.when(function () { goToStep(index); });
+          return;
+        }
+        var step = STEPS[index];
+        var prevIndex = currentIndex;
+        if (index === currentIndex && !isFlying) {
+          if (step.showRouteAnim) {
+            if (currentRouteMode !== ROUTE_MODE_ANCIENT) {
+              currentRouteMode = ROUTE_MODE_ANCIENT;
+              updateRouteModeButtons();
+              updateRouteComparePanel();
+            }
+            startRouteAnimation();
+          }
+          return;
+        }
+
+        currentIndex = index;
+
+        applyStepBasemap(index);
+        markVisitedViewpoints(step);
+        if (step.id !== "intro") {
+          setMapMoreOpen(false);
+        }
+        if (step.showRouteAnim) {
+          updateViewpoints(step.highlight);
+          setDataMapEnrich(false);
+        } else {
+          stopRouteAnimation();
+          updateViewpoints(step.highlight);
+          setDataMapEnrich(step.id === "data");
+        }
+        paintStoryPanel(step, index);
+        view.closePopup();
+        if (isPointStep(step)) {
+          usePointStepViewPadding();
+        } else {
+          applyViewPadding();
+        }
+        flyToStep(step, prevIndex).then(function () {
+          if (step.showRouteAnim) {
+            currentRouteMode = ROUTE_MODE_ANCIENT;
+            routeComparePanelClosed = false;
+            updateRouteModeButtons();
+            updateRouteComparePanel();
+            startRouteAnimation();
+          } else {
+            setDataMapEnrich(step.id === "data");
+            openStepPopup(step);
+          }
+        });
+      }
+
+      el.btnPrev.addEventListener("click", function () { goToStep(currentIndex - 1); });
+      el.btnNext.addEventListener("click", function () {
+        if (currentIndex < STEPS.length - 1) goToStep(currentIndex + 1);
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          if (currentIndex < STEPS.length - 1) goToStep(currentIndex + 1);
+        }
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          goToStep(currentIndex - 1);
+        }
+      });
+
+      el.btnCloseMore.addEventListener("click", function () {
+        setMapMoreOpen(false);
+      });
+
+      el.basemapSelect.addEventListener("change", function () {
+        var key = el.basemapSelect.value;
+        map.basemap = resolveBasemap(key);
+        overviewMap.basemap = resolveBasemap(key);
+      });
+
+      renderMapMorePanel();
+      buildStepNav();
+      initMorePanelWidth();
+      initMorePanelResize();
+      Object.keys(MEDIA).forEach(function (key) {
+        var img = new Image();
+        img.src = MEDIA[key];
+      });
+
+      window.addEventListener("resize", positionRouteMapBubble);
+
+      view.when(function () {
+        viewReady = true;
+        initOverviewMap();
+        applyViewPadding();
+        positionRouteMapBubble();
+        currentIndex = 0;
+        var step0 = STEPS[0];
+        applyStepBasemap(0);
+        updateViewpoints(step0.highlight);
+        setViewToStepInstant(step0);
+        paintStoryPanel(step0, 0);
+      });
+    });
+  </script>
+</body>
+</html>
