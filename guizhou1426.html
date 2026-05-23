@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>贵州省道路数据 · 路径规划（2014–2026）</title>
+  <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      overflow: hidden;
+    }
+
+    #pageHeader {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      line-height: 48px;
+      text-align: center;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #1565c0, #1e88e5);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+      z-index: 200;
+    }
+
+    #viewDiv { height: 100%; width: 100%; }
+
+    #mapToolbar {
+      position: absolute;
+      top: 60px;
+      left: 14px;
+      z-index: 120;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 10px;
+      max-height: calc(100vh - 72px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      pointer-events: auto;
+    }
+
+    .toolbar-column {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    #toolbarLeft {
+      width: 280px;
+    }
+
+    #toolbarRight {
+      width: 260px;
+    }
+
+    .tool-card {
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #d0d0d0;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.12);
+      padding: 10px 12px;
+    }
+
+    .tool-card h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    #basemapSelector,
+    #roadYearSelector {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .tool-card label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #444;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .tool-card label:last-child { margin-bottom: 0; }
+
+    .tool-hint {
+      margin: 8px 0 0;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .tool-btn {
+      width: 100%;
+      margin-top: 6px;
+      padding: 7px 10px;
+      font-size: 13px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #1976d2;
+      color: #fff;
+    }
+
+    .tool-btn.secondary {
+      background: #fff;
+      color: #333;
+      border: 1px solid #ccc;
+    }
+
+    .tool-btn.secondary:hover { background: #f5f5f5; }
+
+    .tool-btn.route-end {
+      background: #fff;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+    }
+
+    .tool-btn.route-end:hover { background: #ffebee; }
+
+    .route-mode-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .route-mode-btns .tool-btn { margin-top: 0; }
+
+    .route-mode-badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      border-radius: 10px;
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .route-mode-badge.planning {
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    #yearPointsLayerHint {
+      margin: 6px 0 0;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .esri-popup__main-container { border-radius: 6px; }
+
+    .milestone-popup { font-size: 13px; line-height: 1.65; color: #444; }
+
+    .milestone-popup h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #1565c0;
+    }
+
+    .milestone-popup p { margin: 0 0 8px; }
+
+    .milestone-popup p:last-child { margin-bottom: 0; }
+
+    .milestone-popup ul {
+      margin: 4px 0 8px;
+      padding-left: 18px;
+    }
+
+    .milestone-popup li { margin-bottom: 4px; }
+
+    .milestone-popup strong { color: #1565c0; }
+
+    #snapRadius {
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    #snapRadiusLabel {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .coord-group {
+      margin-bottom: 10px;
+    }
+
+    .coord-group-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+    }
+
+    .coord-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+
+    .coord-row label {
+      width: 32px;
+      flex-shrink: 0;
+      font-size: 12px;
+      color: #666;
+      margin: 0;
+      cursor: default;
+    }
+
+    .coord-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 5px 6px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    #routeStatus {
+      margin-top: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #444;
+      background: #f5f9ff;
+      border-radius: 4px;
+      border-left: 3px solid #1976d2;
+    }
+
+    #bottomBar {
+      position: absolute;
+      left: 14px;
+      bottom: 12px;
+      z-index: 120;
+      pointer-events: none;
+    }
+
+    #mouseCoord {
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #333;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      white-space: nowrap;
+    }
+
+    #routePanel h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #1565c0;
+    }
+
+    #routePanelContent {
+      display: none;
+    }
+
+    #routePanel.visible #routePanelContent {
+      display: block;
+    }
+
+    #routePanel:not(.visible)::after {
+      content: "完成路径规划后在此显示结果";
+      display: block;
+      font-size: 12px;
+      color: #999;
+      line-height: 1.6;
+    }
+
+    .route-stat {
+      font-size: 13px;
+      line-height: 1.7;
+      color: #444;
+      margin-bottom: 4px;
+    }
+
+    .route-stat strong { color: #222; }
+
+    #yearInfoPanel {
+      position: absolute;
+      top: 100px;
+      right: 14px;
+      z-index: 120;
+      width: 320px;
+      max-height: calc(100vh - 112px);
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 6px;
+      border: 1px solid #d0d0d0;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+      padding: 14px 16px;
+      pointer-events: auto;
+    }
+
+    #yearInfoPanel h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #1565c0;
+      border-bottom: 2px solid #e3f2fd;
+      padding-bottom: 8px;
+    }
+
+    #yearInfoContent {
+      font-size: 13px;
+      line-height: 1.75;
+      color: #444;
+    }
+
+    #yearInfoContent p {
+      margin: 0 0 10px;
+    }
+
+    #yearInfoContent p:last-child {
+      margin-bottom: 0;
+    }
+
+    #yearInfoContent strong {
+      color: #1565c0;
+      font-weight: 600;
+    }
+
+    .esri-view .esri-view-surface--inset-outline:focus::after { outline: none; }
+  </style>
+  <script src="https://js.arcgis.com/4.30/"></script>
+</head>
+<body>
+  <header id="pageHeader">贵州省道路数据 · 路径规划</header>
+  <div id="viewDiv"></div>
+
+  <div id="mapToolbar">
+    <div class="toolbar-column" id="toolbarLeft">
+      <div class="tool-card">
+        <h3>底图</h3>
+        <select id="basemapSelector" aria-label="选择底图">
+        <option value="streets">街道图（Streets）</option>
+        <option value="topo">地形图（Topographic）</option>
+        <option value="satellite" selected>卫星图（Satellite）</option>
+        <option value="hybrid">混合图（Hybrid）</option>
+        <option value="oceans">海洋图（Oceans）</option>
+        <option value="gray">灰色底图（Gray）</option>
+        <option value="dark-gray">深灰底图（Dark Gray）</option>
+      </select>
+    </div>
+    <div class="tool-card">
+      <h3>道路数据年份</h3>
+      <select id="roadYearSelector" aria-label="选择道路数据年份">
+        <option value="2014">2014 年道路</option>
+        <option value="2015">2015 年道路</option>
+        <option value="2016">2016 年道路</option>
+        <option value="2017">2017 年道路</option>
+        <option value="2018">2018 年道路</option>
+        <option value="2019">2019 年道路</option>
+        <option value="2020">2020 年道路</option>
+        <option value="2021">2021 年道路</option>
+        <option value="2022">2022 年道路</option>
+        <option value="2023">2023 年道路</option>
+        <option value="2024">2024 年道路</option>
+        <option value="2025">2025 年道路</option>
+        <option value="2026" selected>2026 年道路</option>
+      </select>
+      <p class="tool-hint">切换年份后，地图<strong>仅显示</strong>所选年份道路，路径规划也<strong>仅基于</strong>该年份线网。</p>
+    </div>
+    <div class="tool-card">
+      <h3>数据图层（GeoScene Online）</h3>
+      <label><input type="checkbox" id="layerBoundary" checked /> 贵州省市界（面）</label>
+      <label><input type="checkbox" id="layerRoad" checked /> <span id="layerRoadLabel">2026 年道路（线）</span></label>
+      </div>
+      <div class="tool-card">
+        <h3>道路吸附</h3>
+        <p class="tool-hint">点击地图时，在下方半径内搜索最近道路线，起终点将自动吸附到道路。</p>
+      <input type="range" id="snapRadius" min="200" max="3000" step="100" value="1000" />
+      <div id="snapRadiusLabel">搜索半径：1000 米</div>
+    </div>
+    <div class="tool-card">
+      <h3>坐标输入规划</h3>
+      <p class="tool-hint">支持<strong>小数度</strong>（如 106.71362）或<strong>度分秒</strong>（如 106°42′49″、106 42 49）。可加 E/W、N/S 方向。</p>
+      <div class="coord-group">
+        <div class="coord-group-title">起点（A）</div>
+        <div class="coord-row">
+          <label for="startLon">经度</label>
+          <input id="startLon" type="text" placeholder="106.71362 或 106°42′49″E" />
+        </div>
+        <div class="coord-row">
+          <label for="startLat">纬度</label>
+          <input id="startLat" type="text" placeholder="26.57833 或 26°34′42″N" />
+        </div>
+      </div>
+      <div class="coord-group">
+        <div class="coord-group-title">终点（B）</div>
+        <div class="coord-row">
+          <label for="endLon">经度</label>
+          <input id="endLon" type="text" placeholder="107.52306 或 107°31′23″E" />
+        </div>
+        <div class="coord-row">
+          <label for="endLat">纬度</label>
+          <input id="endLat" type="text" placeholder="26.25472 或 26°15′17″N" />
+        </div>
+      </div>
+      <button type="button" class="tool-btn" id="btnPlanByCoord">按坐标规划路径</button>
+    </div>
+    </div>
+    <div class="toolbar-column" id="toolbarRight">
+      <div class="tool-card">
+      <h3>路径规划</h3>
+      <p class="tool-hint" id="routePlanHint">浏览模式下可点击地图<strong>标注点</strong>查看当年交通大事；进入路径规划后标注点隐藏，可依次选择起终点。</p>
+      <span id="routeModeBadge" class="route-mode-badge">浏览模式</span>
+      <div class="route-mode-btns">
+        <button type="button" class="tool-btn" id="btnStartRoutePlanning">开始路径规划</button>
+        <button type="button" class="tool-btn route-end" id="btnEndRoutePlanning" style="display:none">结束路径规划</button>
+      </div>
+      <p class="tool-hint" id="yearPointsLayerHint">当前年份标注点已显示，点击可查看详情。</p>
+      <p class="tool-hint" id="routePlanDetailHint">路径将沿 <span id="routePlanYear">2026</span> 年道路线网计算，道路按双向通行处理。</p>
+      <div id="routeStatus">请点击「开始路径规划」后在地图上选择起点（A）</div>
+      <button type="button" class="tool-btn secondary" id="btnClearRoute">清除路线</button>
+    </div>
+      <aside id="routePanel" class="tool-card">
+        <h2>规划结果</h2>
+        <div id="routePanelContent"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="bottomBar">
+    <div id="mouseCoord">经度 — °　纬度 — °</div>
+  </div>
+
+  <aside id="yearInfoPanel" aria-live="polite">
+    <h2 id="yearInfoTitle">2026 年 · 路网概览</h2>
+    <div id="yearInfoContent"></div>
+  </aside>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
+      "esri/geometry/Polyline",
+      "esri/geometry/Point",
+      "esri/widgets/ScaleBar",
+      "esri/widgets/Compass",
+      "esri/rest/support/Query",
+      "esri/geometry/geometryEngine",
+      "esri/geometry/support/webMercatorUtils"
+    ], function (
+      Map, MapView, FeatureLayer, GraphicsLayer, Graphic, Polyline, Point,
+      ScaleBar, Compass, Query, geometryEngine, webMercatorUtils
+    ) {
+      var ROAD_SERVICES = {
+        2014: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2014年道路数据/FeatureServer/0",
+        2015: "https://www.geosceneonline.cn/server/rest/services/Hosted/2015年贵州省道路数据_立方数据学社/FeatureServer/0",
+        2016: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2016年道路数据/FeatureServer/0",
+        2017: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2017年道路数据/FeatureServer/0",
+        2018: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2018年道路数据/FeatureServer/0",
+        2019: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2019年道路数据/FeatureServer/0",
+        2020: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2020年道路数据/FeatureServer/0",
+        2021: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2021年道路数据/FeatureServer/0",
+        2022: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2022年道路数据/FeatureServer/0",
+        2023: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2023年道路数据/FeatureServer/0",
+        2024: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2024年道路数据/FeatureServer/0",
+        2025: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2025年道路数据/FeatureServer/0",
+        2026: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2026年道路数据/FeatureServer/0"
+      };
+
+      var ROAD_YEAR_INFO = {
+        2014: [
+          "<p>2014年是贵州<strong>“高速公路建设三年会战”</strong>的关键之年。全省高速公路通车里程已突破<strong>4000公里</strong>，<strong>贵遵、贵黄、凯麻</strong>等早期高速已完成扩容或改造，<strong>毕节—都格、六盘水—镇宁</strong>等一批连接黔西北与黔中的大动脉相继贯通。到2014年底，贵州88个县（市、区、特区）中已有<strong>79个通高速公路</strong>，为次年实现<strong>“县县通高速”</strong>目标奠定了决定性基础。</p>",
+          "<p>截至2014年，贵州已建成世界级大桥十余座。如<strong>坝陵河大桥</strong>（2009）、<strong>北盘江大桥</strong>（沪昆高速段，2010）、<strong>马岭河大桥</strong>（2011）等，不仅打通了地理阻隔，更成为路网中的<strong>“控制性节点”</strong>。本系统道路数据完整保留了这些桥梁的线形与拓扑关系。</p>"
+        ],
+        2015: [
+          "<p>2015年，贵州交通迎来圆梦时刻。12月31日，<strong>望谟至安龙、遵义至绥阳延伸线</strong>等最后9个县接通高速，贵州由此成为西部首个、全国第九个<strong>“县县通高速”</strong>的省份。这一年，<strong>贵瓮、道安、凯雷、毕都</strong>等10余条高速集中通车，总里程一举突破<strong>5000公里</strong>。</p>",
+          "<p>桥梁方面也亮点频出——贵黔高速上的<strong>鸭池河大桥</strong>凭借<strong>800米主跨</strong>，当时稳稳拿下<strong>世界最大跨径钢桁梁斜拉桥</strong>的桂冠。</p>"
+        ],
+        2016: [
+          "<p>到了2016年，工作重心转向<strong>提质升级</strong>。<strong>贵遵高速复线</strong>（兰海国高扩容）全面开工，<strong>沪昆高速贵州段</strong>也全线打通，省际通道直连云南。<strong>G320清镇至夏云、G321都匀至惠水</strong>等一批<strong>“畅安舒美”</strong>示范路完成改造。</p>",
+          "<p>年底，杭瑞高速<strong>北盘江第一桥</strong>合龙，桥面与江面之间<strong>565米</strong>的高差，直接把<strong>世界第一高桥</strong>的纪录刷新了一大截。</p>"
+        ],
+        2017: [
+          "<p>2017年则是<strong>成网之年</strong>，全省高速通车里程拉长到<strong>5835公里</strong>，出省通道增加到<strong>15条</strong>，和周边所有省份都实现了高速直连。农村公路方面，启动<strong>“组组通”三年大决战</strong>，当年就建成<strong>2.5万公里</strong>通组硬化路。</p>",
+          "<p>贵州被列为全国首批<strong>“交通强国”</strong>建设试点，路网监控和<strong>ETC</strong>覆盖率大幅提升，交通管理悄悄迈上了新台阶。</p>"
+        ],
+        2018: [
+          "<p>2018年，<strong>兰海高速贵遵复线</strong>全线通车，老贵遵路终于喘了口气；<strong>六威高速</strong>打通了去云南的第二个出省通道。普通公路也没闲着，<strong>G552、G243</strong>等一批国省道改造完成。</p>",
+          "<p>桥梁方面，<strong>大小井特大桥</strong>亮相，这座<strong>世界最大跨径上承式钢管混凝土拱桥</strong>成了黔南新地标。</p>"
+        ],
+        2019: [
+          "<p>2019年，<strong>平塘特大桥</strong>通车，<strong>332米</strong>高的桥塔配上<strong>“天空之桥”</strong>服务区，直接把桥梁观光拉满。这一年，全省<strong>“组组通”</strong>硬化路全面收官，<strong>7.87万公里</strong>通组路通到每个寨子，贵州成为全国第一个实现<strong>“组组通”</strong>的省份。</p>",
+          "<p><strong>ETC门架</strong>也全面铺开，高速收费开始<strong>“一脚油门踩到底”</strong>。</p>"
+        ],
+        2020: [
+          "<p>2020年，全省高速通车里程突破<strong>7600公里</strong>，出省通道增加到<strong>22条</strong>，断头路基本清零。<strong>都安高速</strong>全线通车，<strong>云雾大桥</strong>顺手拿了个<strong>世界最高混凝土桥塔</strong>的名头。</p>",
+          "<p><strong>贵阳地铁2号线</strong>试运行，贵州交通正式进入<strong>“立体换乘”</strong>时代，从<strong>“县县通”</strong>到<strong>“组组通”</strong>再到<strong>“智慧通”</strong>，彻底换了人间。</p>"
+        ],
+        2021: [
+          "<p>2021年，<strong>贵黄高速</strong>（贵阳至黄平）建成通车，<strong>甘溪特大桥</strong>以<strong>300米主跨</strong>刷新了刚构桥新纪录。这一年，<strong>花鱼洞大桥</strong>重建后惊艳亮相，凭借红色提篮造型拿下了桥梁界的“诺贝尔奖”——<strong>古斯塔夫·林德撒尔奖</strong>。</p>",
+          "<p>高速服务区也开始搞<strong>“交旅融合”</strong>，<strong>天空之桥、坝陵河</strong>等成了网红打卡地。</p>"
+        ],
+        2022: [
+          "<p>2022年，<strong>德余高速</strong>（德江至余庆）建成，<strong>乌江特大桥</strong>以<strong>504米主跨</strong>拿下<strong>世界最大跨径上承式钢管混凝土拱桥</strong>。<strong>纳晴高速、六安高速</strong>等项目加速推进，为下一年的通车潮埋下伏笔。</p>",
+          "<p>农村公路这边，<strong>“美丽农村路”</strong>示范创建全面铺开，修路不光为了走，还得好看。</p>"
+        ],
+        2023: [
+          "<p>2023年，全省高速通车里程突破<strong>8300公里</strong>，出省通道增至<strong>26条</strong>。<strong>金烽乌江大桥</strong>正式通车，这座<strong>650米主跨</strong>的悬索桥成了黔北新地标。</p>",
+          "<p><strong>贵南高铁</strong>也在这一年开通，贵州<strong>“高铁环形网”</strong>彻底成型，从公路到铁路，贵州的路越来越“丝滑”。</p>"
+        ],
+        2024: [
+          "<p>2024年，<strong>贵安扩容项目</strong>作为省内首条<strong>“智慧高速”</strong>，全程布满毫米波雷达和无人机，能主动预警事故、实时推送路况。这一年，交通投资超<strong>千亿</strong>，<strong>金仁桐</strong>等4条高速建成，高速总里程直接拉到<strong>9042公里</strong>。</p>",
+          "<p>低空也没闲着，首条<strong>“低空+物流”</strong>无人机送药航线正式开通。</p>"
+        ],
+        2025: [
+          "<p>2025年，<strong>贵平高速</strong>通车，平塘到贵阳从两个半小时缩到<strong>1小时左右</strong>。这条纵贯南北的通道直通<strong>北部湾</strong>，成了贵州最新的一条出海大动脉。</p>",
+          "<p>在建的<strong>花江峡谷大桥</strong>进度拉到<strong>92%</strong>，<strong>世界第一高桥</strong>的旅游标识已经呼之欲出。</p>"
+        ],
+        2026: [
+          "<p>2026年，贵州迈入<strong>“十五五”</strong>开局，规划砸下<strong>209亿</strong>，要新改建农村公路<strong>2500公里</strong>、普通国省道<strong>450公里</strong>。国道省道审批权开始下放，<strong>长周期养护</strong>试点铺开，路网从<strong>“建得多”</strong>转向<strong>“养得好”</strong>。</p>",
+          "<p>从<strong>县县通</strong>到<strong>组组通</strong>，再到<strong>村村美</strong>，贵州的路越来越“有温度”。</p>"
+        ]
+      };
+
+      function milestoneHtml(title, paragraphs, bullets) {
+        var html = '<div class="milestone-popup"><h4>' + title + "</h4>";
+        for (var i = 0; i < paragraphs.length; i++) {
+          html += "<p>" + paragraphs[i] + "</p>";
+        }
+        if (bullets && bullets.length) {
+          html += "<ul>";
+          for (var j = 0; j < bullets.length; j++) {
+            html += "<li>" + bullets[j] + "</li>";
+          }
+          html += "</ul>";
+        }
+        return html + "</div>";
+      }
+
+      var YEAR_MILESTONES = {
+        2014: [
+          { lon: 105.668, lat: 25.945, title: '坝陵河大桥 · 关岭', content: '<div class="milestone-popup"><h4>世界级峡谷桥梁控制性节点</h4><p>坝陵河大桥位于<strong>关岭县</strong>，主跨<strong>1088米</strong>，桥面距谷底约<strong>370米</strong>，是沪昆高速贵州段关键工程。</p><p>2014年随着<strong>高速公路建设三年会战</strong>推进，桥区接线与互通持续优化，成为滇黔通道<strong>控制性节点</strong>，线形与拓扑完整纳入当年路网。</p><ul><li>桥梁数据完整保留于本系统</li><li>与关岭互通形成立体节点</li><li>为县县通高速提供示范</li></ul></div>' },
+          { lon: 106.927, lat: 27.706, title: '贵遵高速 · 遵义', content: '<div class="milestone-popup"><h4>早期大通道扩容改造</h4><p><strong>贵遵高速</strong>是贵州北向出省主骨架，2014年对<strong>贵遵、贵黄、凯麻</strong>等早期高速启动扩容改造。</p><p>遵义枢纽完善，<strong>贵阳—遵义</strong>通道压力缓解，全省高速里程突破<strong>4000公里</strong>。</p></div>' },
+          { lon: 105.285, lat: 27.301, title: '毕节—都格 · 毕节', content: '<div class="milestone-popup"><h4>黔西北连接黔中主动脉</h4><p><strong>毕节—都格</strong>与<strong>六盘水—镇宁</strong>等通道协同推进，打通黔西北与黔中联系。</p><p>2014年底<strong>79个县通高速</strong>，为2015年<strong>县县通高速</strong>奠定决定性基础。</p></div>' },
+          { lon: 104.823, lat: 26.594, title: '六盘水 · 镇宁通道', content: '<div class="milestone-popup"><h4>六盘水—镇宁大通道</h4><p>2014年<strong>六盘水—镇宁</strong>建设取得突破，结束部分<strong>路断头</strong>历史。</p><p>六盘水由资源孤岛转向<strong>西南能源外运通道</strong>，对突破4000公里里程具有标志意义。</p></div>' }
+        ],
+        2015: [
+          { lon: 106.738, lat: 27.085, title: '鸭池河大桥 · 息烽', content: '<div class="milestone-popup"><h4>世界最大跨径钢桁梁斜拉桥</h4><p><strong>鸭池河大桥</strong>主跨<strong>800米</strong>，2015年建成时为<strong>世界最大跨径钢桁梁斜拉桥</strong>。</p><p>贵黔高速控制性工程，息烽、黔西融入贵阳<strong>1小时经济圈</strong>。</p><ul><li>钢桁梁+斜拉组合创纪录</li><li>贵黔高速关键节点</li></ul></div>' },
+          { lon: 105.894, lat: 25.166, title: '望谟—安龙 · 黔西南', content: '<div class="milestone-popup"><h4>西部首个县县通高速省份</h4><p>2015年12月31日<strong>望谟至安龙</strong>等最后9县通高速，贵州成<strong>西部首个县县通高速</strong>省份。</p><p>全省里程突破<strong>5000公里</strong>，交通建设进入全国先进行列。</p></div>' },
+          { lon: 107.882, lat: 25.429, title: '凯雷高速 · 雷山', content: '<div class="milestone-popup"><h4>10余条高速集中通车</h4><p><strong>贵瓮、道安、凯雷、毕都</strong>等10余条高速集中通车。</p><p>凯雷高速打通雷山快速通道，形成<strong>高速旅游环线</strong>，交旅融合早期样板。</p></div>' },
+          { lon: 106.715, lat: 26.578, title: '贵阳 · 圆梦时刻', content: '<div class="milestone-popup"><h4>5000公里里程碑</h4><p>2015年是贵州交通<strong>圆梦之年</strong>，以贵阳为中心的放射状高速网基本成型。</p><p>县县通目标全面实现，养护与服务设施标准化同步推进。</p></div>' }
+        ],
+        2016: [
+          { lon: 105.667, lat: 25.651, title: '北盘江第一桥', content: '<div class="milestone-popup"><h4>565米高差世界第一高桥</h4><p>2016年底杭瑞高速<strong>北盘江第一桥</strong>合龙，桥面至江面高差<strong>565米</strong>，刷新<strong>世界第一高桥</strong>纪录。</p><p>主跨720米，云贵共管关键节点，桥隧比极高。</p></div>' },
+          { lon: 106.852, lat: 27.498, title: '贵遵复线 · 开工', content: '<div class="milestone-popup"><h4>兰海国高扩容全面开工</h4><p><strong>贵遵高速复线</strong>全面开工，分流老贵遵饱和流量。</p><p>途经遵义、息烽，隧道群与桥梁群密集，为2018通车奠基。</p></div>' },
+          { lon: 105.618, lat: 25.952, title: '沪昆高速 · 关岭', content: '<div class="milestone-popup"><h4>沪昆贵州段全线打通</h4><p><strong>沪昆高速贵州段</strong>全线打通，直连云南，成为<strong>东西向交通走廊</strong>。</p><p>关岭段串联坝陵河、北盘江大桥群，桥隧比极高。</p></div>' },
+          { lon: 106.278, lat: 26.556, title: 'G320 · 清镇夏云', content: '<div class="milestone-popup"><h4>畅安舒美示范路</h4><p>国省道<strong>G320清镇至夏云、G321都匀至惠水</strong>等示范路完成改造。</p><p>工作重心转向<strong>提质升级</strong>，高速与普通干线互补成网。</p></div>' }
+        ],
+        2017: [
+          { lon: 106.630, lat: 26.647, title: '贵阳 · 交通强国', content: '<div class="milestone-popup"><h4>全国首批交通强国试点</h4><p>贵州列为全国首批<strong>交通强国</strong>建设试点，高速里程达<strong>5835公里</strong>。</p><p>出省通道增至<strong>15条</strong>，与周边省份全部高速直连。</p><ul><li>路网监控升级</li><li>ETC覆盖率大幅提升</li></ul></div>' },
+          { lon: 107.518, lat: 26.258, title: '都匀 · 组组通', content: '<div class="milestone-popup"><h4>组组通三年大决战</h4><p>启动<strong>组组通三年大决战</strong>，当年建成<strong>2.5万公里</strong>通组硬化路。</p><p>都匀、黔南优先推进，硬化路通到寨，为2019收官打基础。</p></div>' },
+          { lon: 104.830, lat: 26.592, title: '六盘水 · 出省通道', content: '<div class="milestone-popup"><h4>15条省际高速直连</h4><p>与云、川、渝、湘、桂全部高速直连，出省通道达<strong>15条</strong>。</p><p>六盘水作为<strong>云贵门户</strong>，六镇等通道加密。</p></div>' },
+          { lon: 109.189, lat: 27.718, title: '铜仁 · 成网之年', content: '<div class="milestone-popup"><h4>5835公里成网</h4><p>2017为<strong>成网之年</strong>，铜仁等黔东高速密度提升。</p><p>交通管理向数字化、精细化转型。</p></div>' }
+        ],
+        2018: [
+          { lon: 106.748, lat: 25.428, title: '大小井特大桥 · 罗甸', content: '<div class="milestone-popup"><h4>世界最大上承式钢管混凝土拱桥</h4><p><strong>大小井特大桥</strong>2018年亮相，创<strong>世界最大跨径上承式钢管混凝土拱桥</strong>纪录。</p><p>罗甸县地标，桥景一体，融入贵阳2小时圈。</p></div>' },
+          { lon: 104.282, lat: 26.856, title: '六威高速 · 威宁', content: '<div class="milestone-popup"><h4>第二条云贵高速出省通道</h4><p><strong>六威高速</strong>通车，打通至云南<strong>第二高速出省通道</strong>。</p><p>经威宁—昭通，乌蒙山区交通瓶颈显著改善。</p></div>' },
+          { lon: 106.852, lat: 27.498, title: '贵遵复线 · 通车', content: '<div class="milestone-popup"><h4>兰海高速贵遵复线通车</h4><p><strong>贵遵复线</strong>全线通车，老贵遵压力分流，贵遵通行时间缩短。</p><p>与<strong>G552、G243</strong>国省道改造协同成网。</p></div>' },
+          { lon: 107.485, lat: 28.563, title: 'G552 · 黔北改造', content: '<div class="milestone-popup"><h4>普通干线提质</h4><p><strong>G552、G243</strong>等国省道改造完成，毛细血管与高速主动脉衔接更顺。</p><p>县乡上高速效率提升，路网运行品质改善。</p></div>' }
+        ],
+        2019: [
+          { lon: 107.078, lat: 25.823, title: '平塘特大桥 · 天空之桥', content: '<div class="milestone-popup"><h4>332米桥塔与天空之桥服务区</h4><p><strong>平塘特大桥</strong>通车，<strong>332米</strong>桥塔配<strong>天空之桥</strong>服务区。</p><p>开创桥梁观光+高速服务新模式，成网红打卡地。</p><ul><li>桥塔观光平台</li><li>交旅融合全国示范</li></ul></div>' },
+          { lon: 107.977, lat: 26.583, title: '黔东南 · 组组通收官', content: '<div class="milestone-popup"><h4>全国首个组组通省份</h4><p><strong>组组通</strong>硬化路全面收官，建成<strong>7.87万公里</strong>通组路。</p><p>贵州成全国<strong>第一个组组通</strong>省份，农村出行历史性改善。</p></div>' },
+          { lon: 106.630, lat: 26.647, title: '贵阳 · ETC门架', content: '<div class="milestone-popup"><h4>一脚油门踩到底</h4><p>全省<strong>ETC门架</strong>全面铺开，取消省界站，实现不停车收费。</p><p>高速收费进入<strong>一脚油门踩到底</strong>时代。</p></div>' },
+          { lon: 105.285, lat: 27.301, title: '毕节 · 通组延伸', content: '<div class="milestone-popup"><h4>高速+通组路双轮驱动</h4><p>毕节<strong>通组硬化路</strong>延伸至偏远村寨，与已通高速县乡衔接。</p><p>组到县、县到省会出行链条全面打通。</p></div>' }
+        ],
+        2020: [
+          { lon: 107.352, lat: 25.718, title: '云雾大桥 · 都安高速', content: '<div class="milestone-popup"><h4>世界最高混凝土桥塔</h4><p><strong>都安高速</strong>全线通车，<strong>云雾大桥</strong>桥塔创<strong>世界最高混凝土桥塔</strong>纪录。</p><p>都匀至安顺快速通道，黔中经济圈南扩。</p></div>' },
+          { lon: 106.705, lat: 26.573, title: '贵阳地铁2号线', content: '<div class="milestone-popup"><h4>立体换乘时代</h4><p><strong>贵阳地铁2号线</strong>试运行，公路与轨道融合。</p><p>与1号线十字换乘，形成多层次城市交通体系。</p></div>' },
+          { lon: 106.630, lat: 26.647, title: '贵阳 · 7600公里', content: '<div class="milestone-popup"><h4>22条出省通道</h4><p>高速里程突破<strong>7600公里</strong>，出省通道<strong>22条</strong>，断头路基本清零。</p><p>从县县通、组组通到<strong>智慧通</strong>，进入提质增效阶段。</p></div>' },
+          { lon: 108.521, lat: 26.953, title: '黔东南 · 智慧交通', content: '<div class="milestone-popup"><h4>路网监控升级</h4><p>黔东南<strong>路网监控</strong>全面升级，事件检测与应急调度增强。</p><p>与ETC门架数据联网，向数据驱动管理转变。</p></div>' }
+        ],
+        2021: [
+          { lon: 106.952, lat: 26.648, title: '甘溪特大桥 · 贵黄', content: '<div class="milestone-popup"><h4>300米主跨刚构桥纪录</h4><p><strong>贵黄高速</strong>通车，<strong>甘溪特大桥</strong>主跨<strong>300米</strong>刷新刚构桥纪录。</p><p>贵阳至黄平快速通道，服务旧州等旅游景区。</p><ul><li>贵黄高速全线通车</li><li>贵阳东向出省通道加密</li></ul></div>' },
+          { lon: 106.698, lat: 26.548, title: '花鱼洞大桥', content: '<div class="milestone-popup"><h4>古斯塔夫·林德撒尔奖</h4><p>重建<strong>花鱼洞大桥</strong>红色提篮造型亮相，获<strong>古斯塔夫·林德撒尔奖</strong>。</p><p>原位拆建技术，是山区城市桥梁更新改造典范。</p></div>' },
+          { lon: 107.078, lat: 25.823, title: '天空之桥 · 交旅融合', content: '<div class="milestone-popup"><h4>网红服务区打卡地</h4><p><strong>天空之桥、坝陵河</strong>等服务区持续完善，<strong>交旅融合</strong>成新标准。</p><p>观景台、桥梁博物馆集聚，服务区升级为<strong>旅游目的地</strong>。</p></div>' },
+          { lon: 107.882, lat: 26.583, title: '凯里 · 贵黄连接', content: '<div class="milestone-popup"><h4>黔东高速网络加密</h4><p>贵黄高速与<strong>凯里绕城、余凯高速</strong>高效衔接，州府<strong>30分钟上高速</strong>基本实现。</p><p>苗寨、古镇等景区与高速连接更加顺畅。</p></div>' }
+        ],
+        2022: [
+          { lon: 107.848, lat: 27.352, title: '乌江特大桥 · 德余', content: '<div class="milestone-popup"><h4>504米主跨世界最大拱桥</h4><p><strong>德余高速</strong>建成，<strong>乌江特大桥</strong>主跨<strong>504米</strong>，再夺<strong>世界最大跨径上承式钢管混凝土拱桥</strong>。</p><p>连接铜仁—遵义，填补乌江以北高速空白。</p><ul><li>德余高速全线通车</li><li>黔东北内部环线成型</li></ul></div>' },
+          { lon: 105.218, lat: 26.259, title: '纳晴高速 · 建设', content: '<div class="milestone-popup"><h4>纳晴六安高速加速推进</h4><p><strong>纳晴高速、六安高速</strong>加速推进，为2023通车潮埋下伏笔。</p><p>穿越<strong>乌蒙山区</strong>，是当年在建难度最高项目集群之一。</p></div>' },
+          { lon: 106.630, lat: 26.647, title: '贵阳 · 美丽农村路', content: '<div class="milestone-popup"><h4>美丽农村路示范创建</h4><p><strong>美丽农村路</strong>示范创建全面铺开，修路要好看、好管、好用。</p><p>贵阳周边多条通组路升级，路域环境与人居品质同步提升。</p></div>' },
+          { lon: 107.485, lat: 28.563, title: '遵义 · 德余北延', content: '<div class="milestone-popup"><h4>黔东北通道完善</h4><p>德余高速与<strong>遵余、杭瑞</strong>等线路衔接，黔东北<strong>高速环线</strong>逐步成型。</p><p>乌江以北区域与成渝、长株潭联系更加便捷。</p></div>' }
+        ],
+        2023: [
+          { lon: 106.622, lat: 26.952, title: '金烽乌江大桥', content: '<div class="milestone-popup"><h4>650米主跨悬索桥</h4><p><strong>金烽乌江大桥</strong>通车，<strong>650米主跨</strong>悬索桥成黔北新地标。</p><p>连接息烽与开阳，完善贵阳北部高速网络。</p></div>' },
+          { lon: 107.882, lat: 25.412, title: '荔波 · 贵南高铁', content: '<div class="milestone-popup"><h4>高铁环形网成型</h4><p><strong>贵南高铁</strong>开通，贵州<strong>高铁环形网</strong>彻底成型。</p><p>公路与铁路<strong>多式联运</strong>，入黔出黔更加丝滑。</p></div>' },
+          { lon: 106.630, lat: 26.647, title: '贵阳 · 8300公里', content: '<div class="milestone-popup"><h4>26条出省通道</h4><p>全省高速里程突破<strong>8300公里</strong>，出省通道增至<strong>26条</strong>。</p><p>路网由建设高峰转向<strong>运营服务</strong>与品质提升。</p></div>' },
+          { lon: 105.218, lat: 26.259, title: '纳晴高速 · 通车', content: '<div class="milestone-popup"><h4>乌蒙山区高速突破</h4><p><strong>纳晴高速</strong>等线路通车，乌蒙山区高速密度显著提升。</p><p>纳雍、晴隆等资源县对外通道全面打开。</p></div>' }
+        ],
+        2024: [
+          { lon: 106.752, lat: 26.548, title: '贵安扩容 · 智慧高速', content: '<div class="milestone-popup"><h4>省内首条智慧高速</h4><p><strong>贵安扩容</strong>作为省内首条<strong>智慧高速</strong>，布设毫米波雷达与无人机巡检。</p><p>可主动预警事故、实时推送路况，交通投资超<strong>千亿</strong>。</p><ul><li>毫米波雷达全覆盖</li><li>无人机巡检试点</li></ul></div>' },
+          { lon: 106.630, lat: 26.647, title: '贵阳 · 低空物流', content: '<div class="milestone-popup"><h4>低空+物流无人机送药</h4><p>首条<strong>低空+物流</strong>无人机送药航线开通，山区应急配送模式创新。</p><p>高速<strong>9042公里</strong>，<strong>金仁桐</strong>等4条高速建成。</p></div>' },
+          { lon: 107.485, lat: 28.563, title: '遵义 · 金仁桐', content: '<div class="milestone-popup"><h4>4条高速建成</h4><p><strong>金仁桐</strong>等高速建成，遵义北部与仁怀、桐梓联系加密。</p><p>赤水河区域产业带获得新的高速支撑。</p></div>' },
+          { lon: 107.352, lat: 25.718, title: '都安 · 路网运营', content: '<div class="milestone-popup"><h4>智慧管理与交旅融合</h4><p>都安通道沿线<strong>智慧服务区</strong>升级，路况与气象信息实时发布。</p><p>桥区旅游与物流节点功能叠加，路网价值多元释放。</p></div>' }
+        ],
+        2025: [
+          { lon: 107.318, lat: 25.832, title: '贵平高速 · 平塘', content: '<div class="milestone-popup"><h4>平塘至贵阳1小时</h4><p><strong>贵平高速</strong>通车，平塘到贵阳从两个半小时缩至<strong>1小时左右</strong>。</p><p>纵贯南北直通<strong>北部湾</strong>，成最新出海大动脉。</p></div>' },
+          { lon: 105.632, lat: 25.452, title: '花江峡谷大桥 · 贞丰', content: '<div class="milestone-popup"><h4>世界第一高桥呼之欲出</h4><p>在建<strong>花江峡谷大桥</strong>进度达<strong>92%</strong>，<strong>世界第一高桥</strong>旅游标识呼之欲出。</p><p>桥旅融合规划超前布局，峡谷观光与高速通行结合。</p></div>' },
+          { lon: 106.715, lat: 26.578, title: '贵阳 · 出海通道', content: '<div class="milestone-popup"><h4>北部湾方向新通道</h4><p>贵平高速使贵阳经平塘至<strong>北部湾</strong>路径显著缩短。</p><p>贵州<strong>南向出海</strong>通道体系进一步完善。</p></div>' },
+          { lon: 107.078, lat: 25.823, title: '平塘 · 天空之桥升级', content: '<div class="milestone-popup"><h4>桥区服务持续升级</h4><p>平塘区域<strong>天空之桥</strong>服务设施持续升级，与贵平高速形成旅游交通新组合。</p><p>桥梁科普、餐饮、观景功能更加完善。</p></div>' }
+        ],
+        2026: [
+          { lon: 106.630, lat: 26.647, title: '贵阳 · 十五五开局', content: '<div class="milestone-popup"><h4>209亿养护规划</h4><p>2026年迈入<strong>十五五</strong>开局，规划投入<strong>209亿</strong>新改建农村公路<strong>2500公里</strong>、国省道<strong>450公里</strong>。</p><p>路网从<strong>建得多</strong>转向<strong>养得好</strong>。</p><ul><li>长周期养护试点</li><li>审批权下放</li></ul></div>' },
+          { lon: 107.232, lat: 27.048, title: '铜仁 · 国省道改造', content: '<div class="milestone-popup"><h4>450公里国省道计划</h4><p>普通国省道<strong>450公里</strong>改造计划启动，黔东干线通行品质提升。</p><p>与高速网形成<strong>干支协调</strong>的养护体系。</p></div>' },
+          { lon: 106.278, lat: 26.556, title: '清镇 · 村村美', content: '<div class="milestone-popup"><h4>从组组通到村村美</h4><p><strong>村村美</strong>理念推进，通组路向<strong>美丽农村路</strong>纵深延伸。</p><p>路域绿化、安防、排水系统标准化建设。</p></div>' },
+          { lon: 105.285, lat: 27.301, title: '毕节 · 农村公路', content: '<div class="milestone-popup"><h4>2500公里农村路计划</h4><p>毕节等地<strong>2500公里</strong>农村公路新改建任务分解落地，偏远村寨出行持续改善。</p><p>贵州的路越来越<strong>有温度</strong>。</p></div>' }
+        ]
+      };
+
+      var SERVICE = {
+        boundary: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省桥梁市界/FeatureServer/1"
+      };
+
+      var isRoutePlanningMode = false;
+      var yearPointsVisible = true;
+
+      var milestoneSymbol = {
+        type: "simple-marker",
+        style: "diamond",
+        color: [255, 152, 0, 0.95],
+        size: 13,
+        outline: { color: [255, 255, 255], width: 2 }
+      };
+
+      var yearPointsLayer = new GraphicsLayer({
+        title: "年份标注点",
+        listMode: "hide"
+      });
+
+      var currentRoadYear = 2026;
+
+      var CONNECT_TOLERANCE_M = 25;
+      var MIN_SEARCH_BUFFER_M = 2000;
+      var QUERY_PAGE_SIZE = 2000;
+      var GRAPH_CHUNK_SIZE = 500;
+      var EDGE_KEY_MULT = 10000000;
+      var snapSearchRadiusM = 1000;
+      var START_NODE_ID = 0;
+      var END_NODE_ID = 1;
+
+      var boundaryLayer = new FeatureLayer({
+        url: SERVICE.boundary,
+        title: "贵州省市界（面）",
+        outFields: ["*"],
+        popupEnabled: false,
+        opacity: 0.3
+      });
+
+      var roadLayerCache = {};
+      var activeRoadLayer = null;
+
+      var roadLayerRenderer = {
+        type: "simple",
+        symbol: {
+          type: "simple-line",
+          color: [220, 53, 69, 0.85],
+          width: 1.2
+        }
+      };
+
+      function createRoadLayer(year) {
+        return new FeatureLayer({
+          url: ROAD_SERVICES[year],
+          title: year + "年贵州省道路数据",
+          outFields: ["*"],
+          popupEnabled: false,
+          visible: false,
+          renderer: roadLayerRenderer
+        });
+      }
+
+      function getActiveRoadLayer() {
+        return activeRoadLayer;
+      }
+
+      function setActiveRoadLayer(year) {
+        var layerRoadVisible = document.getElementById("layerRoad").checked;
+
+        if (activeRoadLayer) {
+          activeRoadLayer.visible = false;
+          map.remove(activeRoadLayer);
+        }
+
+        if (!roadLayerCache[year]) {
+          roadLayerCache[year] = createRoadLayer(year);
+        }
+
+        activeRoadLayer = roadLayerCache[year];
+        map.add(activeRoadLayer, 1);
+        activeRoadLayer.visible = layerRoadVisible;
+        return activeRoadLayer.load();
+      }
+
+      var stopLayer = new GraphicsLayer({ title: "起终点" });
+      var routeLayer = new GraphicsLayer({ title: "规划路线" });
+      var snapBufferLayer = new GraphicsLayer({ title: "吸附搜索范围" });
+
+      var map = new Map({
+        basemap: "satellite",
+        layers: [boundaryLayer, yearPointsLayer, routeLayer, snapBufferLayer, stopLayer]
+      });
+
+      setActiveRoadLayer(currentRoadYear);
+
+      var view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: [106.55, 26.65],
+        zoom: 7,
+        padding: { top: 52 }
+      });
+
+      view.ui.add(new ScaleBar({ view: view, unit: "metric" }), "bottom-left");
+      view.ui.add(new Compass({ view: view }), "top-right");
+
+      var routeStatusEl = document.getElementById("routeStatus");
+      var routePanel = document.getElementById("routePanel");
+      var routePanelContent = document.getElementById("routePanelContent");
+
+      var startPoint = null;
+      var endPoint = null;
+      var startSnapInfo = null;
+      var endSnapInfo = null;
+      var isRouting = false;
+      var isSnapping = false;
+      var roadNetCache = { key: "", graph: null, nodeIndex: null };
+
+      var startSymbol = {
+        type: "simple-marker",
+        style: "circle",
+        color: [46, 125, 50, 0.95],
+        size: 14,
+        outline: { color: [255, 255, 255], width: 2 }
+      };
+
+      var endSymbol = {
+        type: "simple-marker",
+        style: "circle",
+        color: [211, 47, 47, 0.95],
+        size: 14,
+        outline: { color: [255, 255, 255], width: 2 }
+      };
+
+      var routeSymbol = {
+        type: "simple-line",
+        color: [0, 120, 215, 0.95],
+        width: 5,
+        cap: "round",
+        join: "round"
+      };
+
+      function setRouteStatus(text) {
+        routeStatusEl.innerHTML = text;
+      }
+
+      function yieldToUI() {
+        return new Promise(function (resolve) {
+          setTimeout(resolve, 0);
+        });
+      }
+
+      function roadLabel(attrs) {
+        if (!attrs) return "未命名道路";
+        return attrs.name || attrs.ref || attrs.fclass_cn || "未命名道路";
+      }
+
+      function normalizeCoordText(text) {
+        return String(text || "")
+          .trim()
+          .replace(/[度]/g, "°")
+          .replace(/[分′']/g, "'")
+          .replace(/[秒″"]/g, '"')
+          .replace(/,/g, " ")
+          .replace(/\s+/g, " ");
+      }
+
+      function applyDirection(value, dir, isLat) {
+        if (!dir) return value;
+        var d = dir.toUpperCase();
+        if (d === "W" || d === "S") return -Math.abs(value);
+        if (d === "E" || d === "N") return Math.abs(value);
+        return value;
+      }
+
+      function parseCoordComponent(text, isLat) {
+        var raw = normalizeCoordText(text);
+        if (!raw) return null;
+
+        var dirMatch = raw.match(/([EWNS])$/i);
+        var dir = dirMatch ? dirMatch[1] : null;
+        if (dir) raw = raw.replace(/[EWNS]$/i, "").trim();
+
+        var dec = raw.match(/^(-?\d+(?:\.\d+)?)\s*°?$/);
+        if (dec) {
+          return applyDirection(parseFloat(dec[1]), dir, isLat);
+        }
+
+        var nums = raw.match(/\d+(?:\.\d+)?/g);
+        if (!nums || !nums.length) return null;
+
+        var sign = 1;
+        if (/^-/.test(raw) || dir === "W" || dir === "S") sign = -1;
+
+        var value;
+        if (nums.length === 1) {
+          value = parseFloat(nums[0]);
+        } else if (nums.length === 2) {
+          value = parseFloat(nums[0]) + parseFloat(nums[1]) / 60;
+        } else {
+          value = parseFloat(nums[0]) +
+            parseFloat(nums[1]) / 60 +
+            parseFloat(nums[2]) / 3600;
+        }
+
+        if (sign < 0) value = -Math.abs(value);
+        else if (dir === "E" || dir === "N") value = Math.abs(value);
+
+        return value;
+      }
+
+      function validateLonLat(lon, lat) {
+        if (lon == null || lat == null || !isFinite(lon) || !isFinite(lat)) {
+          return "坐标格式无法识别，请使用小数度或度分秒格式。";
+        }
+        if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+          return "经纬度超出有效范围（经度 ±180°，纬度 ±90°）。";
+        }
+        if (lon < 103 || lon > 110 || lat < 24 || lat > 30) {
+          return "坐标不在贵州省常见范围内，仍将尝试规划。";
+        }
+        return null;
+      }
+
+      function lonLatToViewPoint(lon, lat) {
+        var geoPt = new Point({ longitude: lon, latitude: lat });
+        if (view.spatialReference && view.spatialReference.isWebMercator) {
+          return webMercatorUtils.geographicToWebMercator(geoPt);
+        }
+        return geoPt;
+      }
+
+      function planRouteFromCoordinateInputs() {
+        if (isRouting || isSnapping) {
+          setRouteStatus("正在处理中，请稍候…");
+          return;
+        }
+        if (!isRoutePlanningMode) {
+          setRoutePlanningMode(true);
+        }
+
+        var startLon = parseCoordComponent(document.getElementById("startLon").value, false);
+        var startLat = parseCoordComponent(document.getElementById("startLat").value, true);
+        var endLon = parseCoordComponent(document.getElementById("endLon").value, false);
+        var endLat = parseCoordComponent(document.getElementById("endLat").value, true);
+
+        if (startLon == null || startLat == null) {
+          setRouteStatus("起点经纬度格式有误，请检查输入。");
+          return;
+        }
+        if (endLon == null || endLat == null) {
+          setRouteStatus("终点经纬度格式有误，请检查输入。");
+          return;
+        }
+
+        var warnStart = validateLonLat(startLon, startLat);
+        var warnEnd = validateLonLat(endLon, endLat);
+        if (warnStart && warnStart.indexOf("无法识别") >= 0) {
+          setRouteStatus(warnStart);
+          return;
+        }
+        if (warnEnd && warnEnd.indexOf("无法识别") >= 0) {
+          setRouteStatus(warnEnd);
+          return;
+        }
+
+        var startMapPt = lonLatToViewPoint(startLon, startLat);
+        var endMapPt = lonLatToViewPoint(endLon, endLat);
+
+        routeLayer.removeAll();
+        routePanel.classList.remove("visible");
+        startPoint = null;
+        endPoint = null;
+        startSnapInfo = null;
+        endSnapInfo = null;
+
+        var warnMsg = "";
+        if (warnStart && warnStart.indexOf("常见范围") >= 0) warnMsg = warnStart;
+        if (warnEnd && warnEnd.indexOf("常见范围") >= 0) warnMsg = warnEnd;
+
+        setRouteStatus(
+          (warnMsg ? warnMsg + " " : "") +
+          "正在按坐标设置起终点并搜索道路…"
+        );
+
+        view.goTo({
+          target: [startMapPt, endMapPt],
+          zoom: 12
+        });
+
+        applySnappedPoint(startMapPt, true).then(function (okStart) {
+          if (!okStart) return;
+          return applySnappedPoint(endMapPt, false);
+        });
+      }
+
+      function fastDist(ax, ay, bx, by) {
+        return Math.hypot(bx - ax, by - ay);
+      }
+
+      function nearestOnSegment(px, py, ax, ay, bx, by) {
+        var dx = bx - ax;
+        var dy = by - ay;
+        var len2 = dx * dx + dy * dy;
+        if (len2 === 0) {
+          return { x: ax, y: ay, dist: fastDist(px, py, ax, ay) };
+        }
+        var t = ((px - ax) * dx + (py - ay) * dy) / len2;
+        t = t < 0 ? 0 : (t > 1 ? 1 : t);
+        var nx = ax + t * dx;
+        var ny = ay + t * dy;
+        return { x: nx, y: ny, dist: fastDist(px, py, nx, ny) };
+      }
+
+      function NodeIndex(toleranceM) {
+        this.tolerance = toleranceM;
+        this.tol2 = toleranceM * toleranceM;
+        this.cellSize = toleranceM;
+        this.nodes = [null, null];
+        this.grid = {};
+        this.nextId = 2;
+      }
+
+      NodeIndex.prototype._cellKey = function (cx, cy) {
+        return cx + "_" + cy;
+      };
+
+      NodeIndex.prototype.getId = function (x, y) {
+        var tol2 = this.tol2;
+        var cs = this.cellSize;
+        var cx = Math.floor(x / cs);
+        var cy = Math.floor(y / cs);
+
+        for (var dx = -1; dx <= 1; dx++) {
+          for (var dy = -1; dy <= 1; dy++) {
+            var bucket = this.grid[this._cellKey(cx + dx, cy + dy)];
+            if (!bucket) continue;
+            for (var i = 0; i < bucket.length; i++) {
+              var n = this.nodes[bucket[i]];
+              var ddx = x - n.x;
+              var ddy = y - n.y;
+              if (ddx * ddx + ddy * ddy <= tol2) {
+                return n.id;
+              }
+            }
+          }
+        }
+
+        var id = this.nextId++;
+        this.nodes[id] = { id: id, x: x, y: y };
+        var key = this._cellKey(cx, cy);
+        if (!this.grid[key]) this.grid[key] = [];
+        this.grid[key].push(id);
+        return id;
+      };
+
+      function MinHeap() {
+        this.heap = [];
+      }
+
+      MinHeap.prototype.push = function (item) {
+        this.heap.push(item);
+        this._bubbleUp(this.heap.length - 1);
+      };
+
+      MinHeap.prototype.pop = function () {
+        var heap = this.heap;
+        if (!heap.length) return undefined;
+        var top = heap[0];
+        var last = heap.pop();
+        if (heap.length) {
+          heap[0] = last;
+          this._sinkDown(0);
+        }
+        return top;
+      };
+
+      MinHeap.prototype.size = function () {
+        return this.heap.length;
+      };
+
+      MinHeap.prototype._bubbleUp = function (i) {
+        var heap = this.heap;
+        while (i > 0) {
+          var p = (i - 1) >> 1;
+          if (heap[p].dist <= heap[i].dist) break;
+          var tmp = heap[p];
+          heap[p] = heap[i];
+          heap[i] = tmp;
+          i = p;
+        }
+      };
+
+      MinHeap.prototype._sinkDown = function (i) {
+        var heap = this.heap;
+        var n = heap.length;
+        while (true) {
+          var l = i * 2 + 1;
+          var r = l + 1;
+          var smallest = i;
+          if (l < n && heap[l].dist < heap[smallest].dist) smallest = l;
+          if (r < n && heap[r].dist < heap[smallest].dist) smallest = r;
+          if (smallest === i) break;
+          var tmp = heap[i];
+          heap[i] = heap[smallest];
+          heap[smallest] = tmp;
+          i = smallest;
+        }
+      };
+
+      function edgeKey(from, to) {
+        return from * EDGE_KEY_MULT + to;
+      }
+
+      function addEdgeToMap(edgeMap, from, to, weight, meta) {
+        var k = edgeKey(from, to);
+        var cur = edgeMap[k];
+        if (!cur || weight < cur.weight) {
+          edgeMap[k] = { weight: weight, meta: meta || {} };
+        }
+      }
+
+      function addSegmentToEdgeMap(edgeMap, nodeIndex, ax, ay, bx, by, meta) {
+        var aId = nodeIndex.getId(ax, ay);
+        var bId = nodeIndex.getId(bx, by);
+        var w = fastDist(ax, ay, bx, by);
+        if (w <= 0) return;
+        addEdgeToMap(edgeMap, aId, bId, w, meta);
+        addEdgeToMap(edgeMap, bId, aId, w, meta);
+      }
+
+      function compileEdgeMap(edgeMap) {
+        var graph = {};
+        for (var k in edgeMap) {
+          if (!Object.prototype.hasOwnProperty.call(edgeMap, k)) continue;
+          var key = Number(k);
+          var from = Math.floor(key / EDGE_KEY_MULT);
+          var to = key % EDGE_KEY_MULT;
+          var e = edgeMap[k];
+          if (!graph[from]) graph[from] = [];
+          graph[from].push({ node: to, weight: e.weight, meta: e.meta });
+        }
+        return graph;
+      }
+
+      function cloneGraph(graph) {
+        var copy = {};
+        var keys = Object.keys(graph);
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          copy[k] = graph[k].slice();
+        }
+        return copy;
+      }
+
+      function cloneNodeIndex(src) {
+        var ni = Object.create(NodeIndex.prototype);
+        ni.tolerance = src.tolerance;
+        ni.tol2 = src.tol2;
+        ni.cellSize = src.cellSize;
+        ni.nextId = src.nextId;
+        ni.nodes = src.nodes.slice();
+        ni.grid = {};
+        for (var key in src.grid) {
+          if (Object.prototype.hasOwnProperty.call(src.grid, key)) {
+            ni.grid[key] = src.grid[key].slice();
+          }
+        }
+        return ni;
+      }
+
+      function extentCacheKey(extent) {
+        if (!extent) return "";
+        return currentRoadYear + "|" + [
+          extent.xmin, extent.ymin, extent.xmax, extent.ymax
+        ].map(function (v) { return Math.round(v); }).join("|");
+      }
+
+      function refreshYearPoints(year) {
+        yearPointsLayer.removeAll();
+        var points = YEAR_MILESTONES[year];
+        if (!points || !points.length) return;
+
+        for (var i = 0; i < points.length; i++) {
+          var p = points[i];
+          yearPointsLayer.add(new Graphic({
+            geometry: new Point({ longitude: p.lon, latitude: p.lat }),
+            symbol: milestoneSymbol,
+            attributes: { title: p.title, year: year },
+            popupTemplate: {
+              title: "{title}（" + year + "年）",
+              content: p.content,
+              outFields: ["title"]
+            }
+          }));
+        }
+        setYearPointsVisible(yearPointsVisible && !isRoutePlanningMode);
+      }
+
+      function setYearPointsVisible(visible) {
+        yearPointsVisible = visible;
+        yearPointsLayer.visible = visible;
+        var hint = document.getElementById("yearPointsLayerHint");
+        if (!hint || isRoutePlanningMode) return;
+        hint.textContent = visible
+          ? "当前年份标注点已显示，点击橙色菱形可查看详情。"
+          : "标注点已隐藏。";
+      }
+
+      function updateRouteModeUI() {
+        var badge = document.getElementById("routeModeBadge");
+        var btnStart = document.getElementById("btnStartRoutePlanning");
+        var btnEnd = document.getElementById("btnEndRoutePlanning");
+        var hint = document.getElementById("yearPointsLayerHint");
+
+        if (isRoutePlanningMode) {
+          badge.textContent = "路径规划模式";
+          badge.classList.add("planning");
+          btnStart.style.display = "none";
+          btnEnd.style.display = "block";
+          if (hint) hint.style.display = "none";
+        } else {
+          badge.textContent = "浏览模式";
+          badge.classList.remove("planning");
+          btnStart.style.display = "block";
+          btnEnd.style.display = "none";
+          if (hint) hint.style.display = "block";
+        }
+      }
+
+      function setRoutePlanningMode(active) {
+        isRoutePlanningMode = active;
+        updateRouteModeUI();
+        if (active) {
+          view.popup.close();
+          setYearPointsVisible(false);
+          setRouteStatus("路径规划模式：请点击地图选择起点（A）");
+        } else {
+          setYearPointsVisible(true);
+          setRouteStatus("浏览模式：可点击地图标注点查看当年交通大事，或点击「开始路径规划」。");
+        }
+      }
+
+      function startRoutePlanningMode() {
+        if (isRouting || isSnapping) {
+          setRouteStatus("正在处理中，请稍候…");
+          return;
+        }
+        clearRoute();
+        setRoutePlanningMode(true);
+      }
+
+      function endRoutePlanningMode() {
+        if (isRouting || isSnapping) {
+          setRouteStatus("正在处理中，请稍候…");
+          return;
+        }
+        clearRoute();
+        setRoutePlanningMode(false);
+      }
+
+      function handleViewClick(event) {
+        if (isRouting || isSnapping) return;
+
+        view.hitTest(event, { include: yearPointsLayer }).then(function (response) {
+          var results = response.results || [];
+          for (var i = 0; i < results.length; i++) {
+            var hit = results[i];
+            if (hit.graphic && hit.graphic.layer === yearPointsLayer) {
+              view.popup.open({
+                features: [hit.graphic],
+                location: hit.graphic.geometry
+              });
+              return;
+            }
+          }
+
+          view.popup.close();
+
+          if (isRoutePlanningMode) {
+            handleMapClick(event.mapPoint);
+          } else {
+            setRouteStatus("浏览模式：请点击地图上的<strong>橙色菱形标注点</strong>查看详情，或点击「开始路径规划」。");
+          }
+        });
+      }
+
+      function updateYearInfoPanel(year) {
+        var titleEl = document.getElementById("yearInfoTitle");
+        var contentEl = document.getElementById("yearInfoContent");
+        var paragraphs = ROAD_YEAR_INFO[year];
+
+        titleEl.textContent = year + " 年 · 路网概览";
+        if (paragraphs && paragraphs.length) {
+          contentEl.innerHTML = paragraphs.join("");
+        } else {
+          contentEl.innerHTML = "<p>暂无该年份的路网背景介绍。</p>";
+        }
+      }
+
+      function updateRoadYearUI(year) {
+        document.getElementById("pageHeader").textContent =
+          "贵州省 " + year + " 年道路数据 · 路径规划";
+        document.getElementById("layerRoadLabel").textContent = year + " 年道路（线）";
+        document.getElementById("routePlanYear").textContent = year;
+        updateYearInfoPanel(year);
+        refreshYearPoints(year);
+        if (activeRoadLayer) {
+          activeRoadLayer.title = year + "年贵州省道路数据";
+        }
+      }
+
+      function invalidateRoadNetCache() {
+        roadNetCache.key = "";
+        roadNetCache.graph = null;
+        roadNetCache.nodeIndex = null;
+      }
+
+      function switchRoadYear(year) {
+        year = Number(year);
+        if (!ROAD_SERVICES[year] || year === currentRoadYear) return;
+
+        currentRoadYear = year;
+        invalidateRoadNetCache();
+        updateRoadYearUI(year);
+
+        var savedStart = startPoint;
+        var savedEnd = endPoint;
+        var hadCompleteRoute = !!(savedStart && savedEnd);
+
+        routeLayer.removeAll();
+        routePanel.classList.remove("visible");
+        snapBufferLayer.removeAll();
+        startPoint = null;
+        endPoint = null;
+        startSnapInfo = null;
+        endSnapInfo = null;
+        stopLayer.removeAll();
+
+        setRouteStatus("正在加载 " + year + " 年道路数据…");
+
+        return setActiveRoadLayer(year).then(function () {
+          refreshYearPoints(year);
+          view.popup.close();
+          if (hadCompleteRoute && isRoutePlanningMode) {
+            setRouteStatus("已切换至 " + year + " 年道路，正在重新吸附起终点并规划…");
+            return applySnappedPoint(savedStart, true).then(function (okStart) {
+              if (!okStart) return;
+              return applySnappedPoint(savedEnd, false);
+            });
+          }
+          if (isRoutePlanningMode) {
+            setRouteStatus("已切换至 " + year + " 年道路，请点击地图选择起点（A）");
+          } else {
+            setRouteStatus("已切换至 " + year + " 年道路，可点击地图标注点查看详情。");
+          }
+        }).catch(function (err) {
+          console.error(err);
+          setRouteStatus("加载 " + year + " 年道路数据失败，请检查网络或服务地址。");
+        });
+      }
+
+      function processFeatureIntoEdgeMap(feature, edgeMap, nodeIndex) {
+        var geom = feature.geometry;
+        if (!geom || !geom.paths) return;
+        var meta = { feature: feature };
+
+        for (var p = 0; p < geom.paths.length; p++) {
+          var path = geom.paths[p];
+          for (var i = 0; i < path.length - 1; i++) {
+            addSegmentToEdgeMap(
+              edgeMap, nodeIndex,
+              path[i][0], path[i][1],
+              path[i + 1][0], path[i + 1][1],
+              meta
+            );
+          }
+        }
+      }
+
+      function buildGraphAsync(features, cacheKey) {
+        if (cacheKey && roadNetCache.key === cacheKey && roadNetCache.graph) {
+          return Promise.resolve({
+            graph: cloneGraph(roadNetCache.graph),
+            nodeIndex: cloneNodeIndex(roadNetCache.nodeIndex)
+          });
+        }
+
+        var edgeMap = {};
+        var nodeIndex = new NodeIndex(CONNECT_TOLERANCE_M);
+        var idx = 0;
+
+        return new Promise(function (resolve) {
+          function step() {
+            var end = Math.min(idx + GRAPH_CHUNK_SIZE, features.length);
+            for (; idx < end; idx++) {
+              processFeatureIntoEdgeMap(features[idx], edgeMap, nodeIndex);
+            }
+            if (idx < features.length) {
+              setTimeout(step, 0);
+            } else {
+              var graph = compileEdgeMap(edgeMap);
+              if (cacheKey) {
+                roadNetCache.key = cacheKey;
+                roadNetCache.graph = cloneGraph(graph);
+                roadNetCache.nodeIndex = cloneNodeIndex(nodeIndex);
+              }
+              resolve({ graph: graph, nodeIndex: nodeIndex });
+            }
+          }
+          step();
+        });
+      }
+
+      function findNearestSegment(point, features) {
+        var px = point.x;
+        var py = point.y;
+        var best = null;
+        var bestDist = Infinity;
+
+        for (var f = 0; f < features.length; f++) {
+          var geom = features[f].geometry;
+          if (!geom || !geom.paths) continue;
+
+          for (var p = 0; p < geom.paths.length; p++) {
+            var path = geom.paths[p];
+            for (var i = 0; i < path.length - 1; i++) {
+              var ax = path[i][0];
+              var ay = path[i][1];
+              var bx = path[i + 1][0];
+              var by = path[i + 1][1];
+              var hit = nearestOnSegment(px, py, ax, ay, bx, by);
+              if (hit.dist < bestDist) {
+                bestDist = hit.dist;
+                best = {
+                  feature: features[f],
+                  coordinate: { x: hit.x, y: hit.y, spatialReference: point.spatialReference },
+                  a: path[i],
+                  b: path[i + 1],
+                  distance: hit.dist
+                };
+              }
+            }
+          }
+        }
+
+        return best;
+      }
+
+      function pushEdge(graph, from, to, weight, meta) {
+        if (!graph[from]) graph[from] = [];
+        graph[from].push({ node: to, weight: weight, meta: meta || {} });
+      }
+
+      function connectSnapEndpoint(graph, nodeIndex, snapInfo) {
+        if (!snapInfo || !snapInfo.coordinate) return null;
+        var sx = snapInfo.coordinate.x;
+        var sy = snapInfo.coordinate.y;
+        var snapId = nodeIndex.getId(sx, sy);
+        var aId = nodeIndex.getId(snapInfo.a[0], snapInfo.a[1]);
+        var bId = nodeIndex.getId(snapInfo.b[0], snapInfo.b[1]);
+        var lenA = fastDist(sx, sy, snapInfo.a[0], snapInfo.a[1]);
+        var lenB = fastDist(sx, sy, snapInfo.b[0], snapInfo.b[1]);
+        var meta = { feature: snapInfo.feature };
+
+        pushEdge(graph, snapId, aId, lenA, meta);
+        pushEdge(graph, aId, snapId, lenA, meta);
+        pushEdge(graph, snapId, bId, lenB, meta);
+        pushEdge(graph, bId, snapId, lenB, meta);
+        return snapId;
+      }
+
+      function astar(graph, nodeIndex, startId, endId) {
+        var endNode = nodeIndex.nodes[endId];
+        if (!endNode) return null;
+
+        var maxId = nodeIndex.nextId;
+        var INF = Infinity;
+        var gScore = new Float64Array(maxId);
+        gScore.fill(INF);
+        gScore[startId] = 0;
+
+        var closed = new Uint8Array(maxId);
+        var prev = [];
+        var ex = endNode.x;
+        var ey = endNode.y;
+        var heap = new MinHeap();
+
+        function heuristic(id) {
+          var n = nodeIndex.nodes[id];
+          return n ? fastDist(n.x, n.y, ex, ey) : 0;
+        }
+
+        heap.push({ id: startId, dist: heuristic(startId) });
+
+        while (heap.size()) {
+          var cur = heap.pop();
+          var u = cur.id;
+          if (closed[u]) continue;
+          if (u === endId) break;
+          closed[u] = 1;
+
+          var edges = graph[u];
+          if (!edges) continue;
+          var gu = gScore[u];
+
+          for (var i = 0; i < edges.length; i++) {
+            var edge = edges[i];
+            var v = edge.node;
+            if (closed[v]) continue;
+            var tentative = gu + edge.weight;
+            if (tentative < gScore[v]) {
+              gScore[v] = tentative;
+              prev[v] = { node: u, meta: edge.meta };
+              heap.push({ id: v, dist: tentative + heuristic(v) });
+            }
+          }
+        }
+
+        if (!isFinite(gScore[endId])) return null;
+
+        var pathIds = [];
+        var node = endId;
+        var guard = 0;
+        while (node !== undefined && guard++ < 500000) {
+          pathIds.unshift(node);
+          if (node === startId) break;
+          var step = prev[node];
+          if (!step) break;
+          node = step.node;
+        }
+        return { ids: pathIds, distance: gScore[endId], prev: prev };
+      }
+
+      function buildRoutePolyline(pathIds, nodeIndex, fromPoint, toPoint) {
+        var coords = [[fromPoint.x, fromPoint.y]];
+        for (var i = 0; i < pathIds.length; i++) {
+          var id = pathIds[i];
+          var n = nodeIndex.nodes[id];
+          if (!n) continue;
+          coords.push([n.x, n.y]);
+        }
+        coords.push([toPoint.x, toPoint.y]);
+
+        var cleaned = [coords[0]];
+        for (var j = 1; j < coords.length; j++) {
+          var p = cleaned[cleaned.length - 1];
+          var c = coords[j];
+          if (Math.abs(p[0] - c[0]) > 0.01 || Math.abs(p[1] - c[1]) > 0.01) {
+            cleaned.push(c);
+          }
+        }
+
+        return new Polyline({
+          paths: [cleaned],
+          spatialReference: view.spatialReference
+        });
+      }
+
+      function queryRoadsInExtent(extent) {
+        var layer = getActiveRoadLayer();
+        if (!layer) return Promise.resolve([]);
+
+        var allFeatures = [];
+        var offset = 0;
+
+        function fetchPage() {
+          var q = new Query({
+            geometry: extent,
+            spatialRelationship: "intersects",
+            returnGeometry: true,
+            outFields: ["fid", "name", "fclass_cn", "ref", "oneway"],
+            num: QUERY_PAGE_SIZE,
+            start: offset
+          });
+          return layer.queryFeatures(q).then(function (result) {
+            var batch = result.features || [];
+            allFeatures = allFeatures.concat(batch);
+            if (result.exceededTransferLimit && batch.length >= QUERY_PAGE_SIZE) {
+              offset += QUERY_PAGE_SIZE;
+              return fetchPage();
+            }
+            return allFeatures;
+          });
+        }
+
+        return fetchPage();
+      }
+
+      function queryRoadsNearPoint(point, radiusM) {
+        var buffer = geometryEngine.geodesicBuffer(point, radiusM, "meters");
+        return queryRoadsInExtent(buffer.extent);
+      }
+
+      function getRouteSearchExtent(p1, p2) {
+        var line = new Polyline({
+          paths: [[[p1.x, p1.y], [p2.x, p2.y]]],
+          spatialReference: view.spatialReference
+        });
+        var directDist = geometryEngine.distance(p1, p2, "meters");
+        var bufferDist = Math.max(
+          MIN_SEARCH_BUFFER_M,
+          directDist * 0.55 + snapSearchRadiusM * 2
+        );
+        var buffered = geometryEngine.geodesicBuffer(line, bufferDist, "meters");
+        return buffered.extent;
+      }
+
+      function getCombinedRouteExtent(p1, p2) {
+        var main = getRouteSearchExtent(p1, p2);
+        var bufA = geometryEngine.geodesicBuffer(p1, snapSearchRadiusM, "meters");
+        var bufB = geometryEngine.geodesicBuffer(p2, snapSearchRadiusM, "meters");
+        var combined = main.clone();
+        combined.union(bufA.extent);
+        combined.union(bufB.extent);
+        return combined;
+      }
+
+      function showSnapBuffer(point, radiusM) {
+        snapBufferLayer.removeAll();
+        var circle = geometryEngine.geodesicBuffer(point, radiusM, "meters");
+        snapBufferLayer.add(new Graphic({
+          geometry: circle,
+          symbol: {
+            type: "simple-fill",
+            color: [25, 118, 210, 0.08],
+            outline: { color: [25, 118, 210, 0.45], width: 1.5 }
+          }
+        }));
+      }
+
+      function featureId(f) {
+        var a = f.attributes || {};
+        return a.fid != null ? a.fid : (a.OBJECTID != null ? a.OBJECTID : f.uid);
+      }
+
+      function mergeFeaturesByFid(listA, listB) {
+        var map = {};
+        listA.forEach(function (f) { map[featureId(f)] = f; });
+        listB.forEach(function (f) { map[featureId(f)] = f; });
+        return Object.keys(map).map(function (k) { return map[k]; });
+      }
+
+      function snapPointToRoad(clickPoint) {
+        return queryRoadsNearPoint(clickPoint, snapSearchRadiusM).then(function (features) {
+          var snap = findNearestSegment(clickPoint, features);
+          if (!snap || snap.distance > snapSearchRadiusM) {
+            return { ok: false, features: features, distance: snap ? snap.distance : null };
+          }
+          return {
+            ok: true,
+            point: snap.coordinate,
+            snap: snap,
+            features: features,
+            roadName: roadLabel(snap.feature.attributes),
+            distance: snap.distance
+          };
+        });
+      }
+
+      function updateStopGraphics() {
+        stopLayer.removeAll();
+        if (startPoint) {
+          stopLayer.add(new Graphic({ geometry: startPoint, symbol: startSymbol }));
+        }
+        if (endPoint) {
+          stopLayer.add(new Graphic({ geometry: endPoint, symbol: endSymbol }));
+        }
+      }
+
+      function clearRoute() {
+        startPoint = null;
+        endPoint = null;
+        startSnapInfo = null;
+        endSnapInfo = null;
+        routeLayer.removeAll();
+        stopLayer.removeAll();
+        snapBufferLayer.removeAll();
+        routePanel.classList.remove("visible");
+        if (isRoutePlanningMode) {
+          setRouteStatus("路径规划模式：请点击地图选择起点（A）");
+        } else {
+          setRouteStatus("浏览模式：可点击地图标注点查看详情，或点击「开始路径规划」。");
+        }
+      }
+
+      function showRouteResult(distanceM, nodeCount, roadNames) {
+        var km = (distanceM / 1000).toFixed(2);
+        routePanelContent.innerHTML =
+          '<p class="route-stat"><strong>路径总长：</strong>' + km + " 公里（" + Math.round(distanceM) + " 米）</p>" +
+          '<p class="route-stat"><strong>途经节点：</strong>' + nodeCount + " 个</p>" +
+          (roadNames.length
+            ? '<p class="route-stat"><strong>主要道路：</strong>' + roadNames.slice(0, 5).join("、") + (roadNames.length > 5 ? " 等" : "") + "</p>"
+            : "");
+        routePanel.classList.add("visible");
+      }
+
+      function collectRoadNames(pathIds, prev) {
+        var names = [];
+        var seen = {};
+        for (var i = 1; i < pathIds.length; i++) {
+          var meta = prev[pathIds[i]] && prev[pathIds[i]].meta;
+          if (meta && meta.feature && !meta.virtual) {
+            var a = meta.feature.attributes;
+            var n = a.name || a.ref || a.fclass_cn;
+            if (n && !seen[n]) {
+              seen[n] = true;
+              names.push(n);
+            }
+          }
+        }
+        return names;
+      }
+
+      function computeRouteFromFeatures(features, cacheKey) {
+        return buildGraphAsync(features, cacheKey).then(function (net) {
+          setRouteStatus("道路网已构建，正在计算最短路径…");
+          return yieldToUI().then(function () {
+            var graph = net.graph;
+            var nodeIndex = net.nodeIndex;
+            var startId = connectSnapEndpoint(graph, nodeIndex, startSnapInfo);
+            var endId = connectSnapEndpoint(graph, nodeIndex, endSnapInfo);
+
+            if (startId == null || endId == null) {
+              return { error: "connect" };
+            }
+
+            var result = astar(graph, nodeIndex, startId, endId);
+            if (!result) return { error: "noPath", featureCount: features.length };
+            if (result.ids.length < 2) return { error: "short" };
+            return {
+              result: result,
+              pathIds: result.ids,
+              nodeIndex: nodeIndex,
+              featureCount: features.length
+            };
+          });
+        });
+      }
+
+      function runRoutePlan() {
+        if (!startPoint || !endPoint || !startSnapInfo || !endSnapInfo || isRouting) return;
+        isRouting = true;
+        setRouteStatus("正在加载道路数据…");
+        routeLayer.removeAll();
+        routePanel.classList.remove("visible");
+        snapBufferLayer.removeAll();
+
+        var combinedExtent = getCombinedRouteExtent(startPoint, endPoint);
+        var netCacheKey = extentCacheKey(combinedExtent);
+
+        queryRoadsInExtent(combinedExtent).then(function (features) {
+          if (!features.length) {
+            setRouteStatus("规划范围内未查询到道路，请增大吸附半径或换一组点位。");
+            return;
+          }
+
+          var cacheHit = roadNetCache.key === netCacheKey;
+          setRouteStatus(
+            cacheHit
+              ? "已加载 " + features.length + " 条道路，复用缓存路网，正在计算最短路径…"
+              : "已加载 " + features.length + " 条道路，正在构建路网（" + CONNECT_TOLERANCE_M + " 米容差）…"
+          );
+
+          return computeRouteFromFeatures(features, netCacheKey);
+        }).then(function (out) {
+          if (!out) return;
+
+          if (out.error === "connect") {
+            setRouteStatus("起终点无法接入道路网，请重新选点。");
+            return;
+          }
+          if (out.error === "noPath") {
+            setRouteStatus(
+              "未能连通起终点（已加载 " + out.featureCount + " 条道路，容差 " + CONNECT_TOLERANCE_M + " 米）。" +
+              "可增大<strong>道路吸附</strong>半径后重试。"
+            );
+            return;
+          }
+          if (out.error === "short") {
+            setRouteStatus("路径过短或无法生成有效路线。");
+            return;
+          }
+
+          var routeLine = buildRoutePolyline(out.pathIds, out.nodeIndex, startPoint, endPoint);
+          routeLayer.add(new Graphic({ geometry: routeLine, symbol: routeSymbol }));
+
+          var roadNames = collectRoadNames(out.result.ids, out.result.prev);
+          showRouteResult(out.result.distance, out.pathIds.length, roadNames);
+          setRouteStatus(
+            "规划完成：约 <strong>" + (out.result.distance / 1000).toFixed(2) +
+            " 公里</strong>（路网 " + out.featureCount + " 段，节点容差 " + CONNECT_TOLERANCE_M + " 米）。"
+          );
+
+          return view.goTo(routeLine.extent.expand(1.4));
+        }).catch(function (err) {
+          console.error(err);
+          setRouteStatus("路径规划失败，请检查 GeoScene 服务或网络连接。");
+        }).finally(function () {
+          isRouting = false;
+        });
+      }
+
+      function applySnappedPoint(mapPoint, isStart) {
+        isSnapping = true;
+        var label = isStart ? "起点" : "终点";
+        setRouteStatus("正在 " + snapSearchRadiusM + " 米范围内搜索最近道路…");
+        showSnapBuffer(mapPoint, snapSearchRadiusM);
+
+        return snapPointToRoad(mapPoint).then(function (res) {
+          if (!res.ok) {
+            var hint = res.distance != null
+              ? "最近道路约 " + Math.round(res.distance) + " 米外。"
+              : "未找到道路线。";
+            setRouteStatus(
+              label + "吸附失败：" + hint + "请增大搜索半径或靠近道路后重试。"
+            );
+            if (isStart) {
+              startPoint = null;
+              startSnapInfo = null;
+            } else {
+              endPoint = null;
+              endSnapInfo = null;
+            }
+            updateStopGraphics();
+            return false;
+          }
+
+          var snapped = new Point({
+            x: res.point.x,
+            y: res.point.y,
+            spatialReference: view.spatialReference
+          });
+
+          if (isStart) {
+            startPoint = snapped;
+            startSnapInfo = res.snap;
+            endPoint = null;
+            endSnapInfo = null;
+            routeLayer.removeAll();
+            routePanel.classList.remove("visible");
+            updateStopGraphics();
+            setRouteStatus(
+              "起点已吸附至 <strong>" + res.roadName + "</strong>（距点击处 " +
+              Math.round(res.distance) + " 米），请选择终点（B）。"
+            );
+          } else {
+            endPoint = snapped;
+            endSnapInfo = res.snap;
+            updateStopGraphics();
+            setRouteStatus(
+              "终点已吸附至 <strong>" + res.roadName + "</strong>（距点击处 " +
+              Math.round(res.distance) + " 米），正在规划…"
+            );
+            runRoutePlan();
+          }
+          return true;
+        }).catch(function (err) {
+          console.error(err);
+          setRouteStatus(label + "搜索道路失败，请检查网络。");
+          return false;
+        }).finally(function () {
+          isSnapping = false;
+        });
+      }
+
+      function handleMapClick(mapPoint) {
+        if (isRouting || isSnapping) return;
+
+        if (!startPoint) {
+          applySnappedPoint(mapPoint, true);
+          return;
+        }
+
+        if (!endPoint) {
+          applySnappedPoint(mapPoint, false);
+          return;
+        }
+
+        startPoint = null;
+        endPoint = null;
+        startSnapInfo = null;
+        endSnapInfo = null;
+        routeLayer.removeAll();
+        routePanel.classList.remove("visible");
+        applySnappedPoint(mapPoint, true);
+      }
+
+      updateRoadYearUI(currentRoadYear);
+      updateRouteModeUI();
+
+      document.getElementById("btnStartRoutePlanning").addEventListener("click", startRoutePlanningMode);
+      document.getElementById("btnEndRoutePlanning").addEventListener("click", endRoutePlanningMode);
+
+      document.getElementById("roadYearSelector").addEventListener("change", function (e) {
+        if (isRouting || isSnapping) {
+          e.target.value = String(currentRoadYear);
+          setRouteStatus("正在处理中，请稍候再切换年份…");
+          return;
+        }
+        switchRoadYear(e.target.value);
+      });
+
+      document.getElementById("basemapSelector").addEventListener("change", function (e) {
+        map.basemap = e.target.value;
+      });
+
+      document.getElementById("layerBoundary").addEventListener("change", function (e) {
+        boundaryLayer.visible = e.target.checked;
+      });
+
+      document.getElementById("layerRoad").addEventListener("change", function (e) {
+        if (activeRoadLayer) activeRoadLayer.visible = e.target.checked;
+      });
+
+      document.getElementById("btnClearRoute").addEventListener("click", clearRoute);
+
+      document.getElementById("btnPlanByCoord").addEventListener("click", planRouteFromCoordinateInputs);
+
+      document.getElementById("snapRadius").addEventListener("input", function (e) {
+        snapSearchRadiusM = Number(e.target.value);
+        document.getElementById("snapRadiusLabel").textContent =
+          "搜索半径：" + snapSearchRadiusM + " 米";
+      });
+
+      view.on("pointer-move", function (evt) {
+        var p = view.toMap(evt);
+        if (!p) return;
+        document.getElementById("mouseCoord").textContent =
+          "经度 " + p.longitude.toFixed(5) + "°　纬度 " + p.latitude.toFixed(5) + "°";
+      });
+
+      view.when(function () {
+        view.on("click", handleViewClick);
+        return boundaryLayer.when(function () {
+          return boundaryLayer.queryExtent();
+        });
+      }).then(function (result) {
+        if (result && result.extent && !result.extent.isEmpty) {
+          return view.goTo(result.extent.expand(1.1));
+        }
+      });
+    });
+  </script>
+</body>
+</html>
