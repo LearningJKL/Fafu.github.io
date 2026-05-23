@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>第四章 · 双桥故事（高度与温度）· 贵州桥梁时空地图</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
+  <style>
+    :root {
+      --bg-deep: #2a3540;
+      --bg-panel: #f4f1eb;
+      --steel: #5c6d7e;
+      --steel-dark: #3d4f5f;
+      --river: #3d7a9b;
+      --river-light: #5a9fc4;
+      --rust: #b85c38;
+      --rust-light: #d4845c;
+      --concrete: #e8e4dc;
+      --accent: #41b7a6;
+      --text: #2c3338;
+      --muted: #5c6570;
+      --green: #2ecc71;
+      --green-bright: #27ae60;
+      --orange: #f29b55;
+      --blue: #233bc8;
+      --red: #e74c3c;
+      --gray: #95a5a6;
+      --header-h: 52px;
+      --panel-w: min(400px, 36vw);
+      --shadow: 0 8px 28px rgba(26, 35, 45, 0.16);
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+      --map-dock-left: 12px;
+      --map-dock-bottom: 12px;
+      --map-dock-width: 200px;
+      --map-dock-overview-h: 180px;
+      --map-dock-tools-h: 40px;
+      --map-dock-gap: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      overflow: hidden;
+      background: var(--bg-deep);
+      color: var(--text);
+    }
+
+    #pageHeader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-h);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: linear-gradient(90deg, var(--steel-dark), var(--steel));
+      color: #fff;
+      border-bottom: 2px solid var(--rust);
+      pointer-events: none;
+    }
+
+    #pageHeader > * { pointer-events: auto; }
+
+    #pageHeader h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    #pageHeader p {
+      font-size: 0.72rem;
+      opacity: 0.88;
+      margin-top: 2px;
+    }
+
+    .header-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-tools select {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .header-tools select option { color: #222; }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      padding-top: var(--header-h);
+    }
+
+    #appMain {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+    }
+
+    #mapWrap {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #dce4e8;
+    }
+
+    .map-badge {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      padding: 6px 16px;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid var(--steel);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--steel-dark);
+      box-shadow: var(--shadow);
+      pointer-events: none;
+      transition: opacity 0.4s var(--ease);
+      white-space: nowrap;
+    }
+
+    .map-badge strong { color: var(--rust); }
+
+    .map-coord-bar {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      max-width: calc(100% - 200px);
+      padding: 6px 14px;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid var(--steel);
+      border-radius: 18px;
+      font-size: 0.74rem;
+      color: var(--steel-dark);
+      box-shadow: var(--shadow);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .map-coord-bar .coord-val {
+      color: var(--rust);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .map-top-left-dock {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: min(280px, 42vw);
+    }
+
+    .map-zoom-slot {
+      display: flex;
+      flex-direction: column;
+      align-self: flex-start;
+      width: fit-content;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(26, 35, 45, 0.14);
+      overflow: hidden;
+    }
+
+    .route-mode-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .route-mode-toggle.visible { display: flex; }
+
+    .route-mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--steel-dark);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 4px 14px rgba(26, 35, 45, 0.12);
+      transition: background 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.2s var(--ease);
+    }
+
+    .route-mode-btn:hover {
+      background: #fff;
+      border-color: var(--river);
+      transform: translateY(-1px);
+    }
+
+    .route-mode-btn.active[data-mode="ancient"] {
+      background: rgba(255, 248, 245, 0.98);
+      border-color: var(--red);
+      box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.25);
+      color: #c0392b;
+    }
+
+    .route-mode-btn.active[data-mode="modern"] {
+      background: rgba(240, 252, 248, 0.98);
+      border-color: var(--green);
+      box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.35);
+      color: #1e8449;
+    }
+
+    .map-zoom-slot button {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: #fff;
+      border-bottom: 1px solid #d0d6dc;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--steel-dark);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .map-zoom-slot button:last-child { border-bottom: none; }
+    .map-zoom-slot button:hover { background: var(--river); color: #fff; }
+
+    .region-toggle {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .region-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border: 1px solid rgba(92, 109, 126, 0.45);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--steel-dark);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 4px 14px rgba(26, 35, 45, 0.12);
+      transition: background 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.2s var(--ease);
+    }
+
+    .region-btn:hover {
+      background: #fff;
+      border-color: var(--river);
+      transform: translateY(-1px);
+    }
+
+    .region-btn.active[data-region="huajiang"] {
+      background: rgba(240, 252, 248, 0.98);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(65, 183, 166, 0.35);
+      color: #2a7a6e;
+    }
+
+    .region-btn.active[data-region="dushan"] {
+      background: rgba(255, 248, 245, 0.98);
+      border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(242, 155, 85, 0.35);
+      color: #c07030;
+    }
+
+    .region-btn.active[data-region="beipan"],
+    .region-btn.active[data-region="yachi"],
+    .region-btn.active[data-region="baling"] {
+      background: rgba(240, 252, 248, 0.98);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(65, 183, 166, 0.35);
+      color: #2a7a6e;
+    }
+
+    .region-btn.active[data-region="leishanSchool"],
+    .region-btn.active[data-region="congjiangHealth"] {
+      background: rgba(255, 248, 245, 0.98);
+      border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(242, 155, 85, 0.35);
+      color: #c07030;
+    }
+
+    .map-corner-dock {
+      position: absolute;
+      left: var(--map-dock-left);
+      bottom: var(--map-dock-bottom);
+      z-index: 1000;
+      width: var(--map-dock-width);
+      display: flex;
+      flex-direction: column;
+      gap: var(--map-dock-gap);
+      pointer-events: none;
+    }
+
+    .map-corner-dock > * { pointer-events: auto; }
+
+    .overview-map-wrap {
+      width: 100%;
+      height: var(--map-dock-overview-h);
+      display: flex;
+      flex-direction: column;
+      background: rgba(244, 241, 235, 0.92);
+      border: 1px solid rgba(92, 109, 126, 0.5);
+      border-radius: 8px;
+      box-shadow: 0 6px 22px rgba(26, 35, 45, 0.22);
+      overflow: hidden;
+    }
+
+    .overview-map-head {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(90deg, var(--steel-dark), var(--steel));
+      letter-spacing: 0.06em;
+    }
+
+    #overviewMap {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+    }
+
+    .map-scale-home-dock {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 1000;
+      display: flex;
+      align-items: stretch;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid rgba(92, 109, 126, 0.42);
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(26, 35, 45, 0.18);
+      overflow: hidden;
+      pointer-events: auto;
+    }
+
+    .scale-bar-widget {
+      display: flex;
+      align-items: center;
+      padding: 8px 14px 10px;
+      min-width: 88px;
+    }
+
+    .scale-bar-line {
+      position: relative;
+      padding: 0 10px 7px;
+      border-bottom: 2px solid #4a5568;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--steel-dark);
+      white-space: nowrap;
+      line-height: 1;
+    }
+
+    .scale-bar-line::before,
+    .scale-bar-line::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      width: 2px;
+      height: 9px;
+      background: #4a5568;
+    }
+
+    .scale-bar-line::before { left: 0; }
+    .scale-bar-line::after { right: 0; }
+
+    .btn-map-home {
+      flex-shrink: 0;
+      width: 40px;
+      min-height: 40px;
+      border: none;
+      border-left: 1px solid rgba(92, 109, 126, 0.35);
+      border-radius: 0;
+      background: #fff;
+      cursor: pointer;
+      color: var(--steel-dark);
+      font-size: 0.95rem;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-map-home:hover {
+      background: var(--river);
+      color: #fff;
+    }
+
+    .map-attribution {
+      position: absolute;
+      left: calc(var(--map-dock-width) + var(--map-dock-left) + 16px);
+      right: 12px;
+      bottom: 4px;
+      z-index: 998;
+      text-align: center;
+      font-size: 0.62rem;
+      line-height: 1.4;
+      color: rgba(44, 51, 56, 0.82);
+      background: rgba(244, 241, 235, 0.88);
+      padding: 4px 10px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .map-legend-panel {
+      position: absolute;
+      right: 12px;
+      top: 52px;
+      z-index: 1000;
+      max-width: min(200px, 32vw);
+      width: min(200px, 32vw);
+      padding: 10px 12px;
+      background: rgba(244, 241, 235, 0.96);
+      border: 1px solid var(--steel);
+      border-radius: 8px;
+      font-size: 0.68rem;
+      line-height: 1.55;
+      box-shadow: var(--shadow);
+    }
+
+    .map-legend-panel h4 {
+      font-size: 0.72rem;
+      margin-bottom: 6px;
+      color: var(--steel-dark);
+    }
+
+    .lg-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    .lg-swatch { width: 18px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+
+    #fxCanvas {
+      position: absolute;
+      inset: 0;
+      z-index: 450;
+      pointer-events: none;
+    }
+
+    .anim-timer-hud {
+      position: absolute;
+      top: 52px;
+      right: calc(12px + min(200px, 32vw) + 14px);
+      z-index: 1001;
+      max-width: min(220px, 38vw);
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(92, 109, 126, 0.4);
+      border-radius: 8px;
+      font-size: 0.72rem;
+      color: var(--steel-dark);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+      pointer-events: none;
+    }
+
+    .anim-timer-hud.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .anim-timer-hud strong { color: var(--rust); font-variant-numeric: tabular-nums; }
+
+    .height-ruler-icon {
+      width: 36px;
+      height: 110px;
+      position: relative;
+      pointer-events: none;
+    }
+
+    .height-ruler-icon .ruler-track {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 6px;
+      height: 100%;
+      margin-left: -3px;
+      background: rgba(61, 79, 95, 0.15);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .height-ruler-icon .ruler-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0;
+      background: linear-gradient(180deg, #5a9fc4, var(--accent));
+      animation: rulerFill 3s ease-in-out infinite;
+    }
+
+  @keyframes rulerFill {
+      0%, 100% { height: 0; }
+      50% { height: 100%; }
+    }
+
+    .height-ruler-icon .ruler-label {
+      position: absolute;
+      left: 110%;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--steel-dark);
+      background: rgba(255,255,255,0.92);
+      padding: 2px 5px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .waterfall-fx {
+      width: 48px;
+      height: 90px;
+      position: relative;
+      overflow: hidden;
+      pointer-events: none;
+      opacity: 0.75;
+    }
+
+    .waterfall-fx span {
+      position: absolute;
+      left: 50%;
+      width: 3px;
+      height: 14px;
+      margin-left: -1.5px;
+      background: linear-gradient(180deg, rgba(90,159,196,0.9), rgba(65,183,166,0.2));
+      border-radius: 2px;
+      animation: waterDrop 1.2s linear infinite;
+    }
+
+    .waterfall-fx span:nth-child(1) { animation-delay: 0s; left: 35%; }
+    .waterfall-fx span:nth-child(2) { animation-delay: 0.3s; left: 50%; }
+    .waterfall-fx span:nth-child(3) { animation-delay: 0.6s; left: 65%; }
+
+    @keyframes waterDrop {
+      0% { top: -14px; opacity: 0; }
+      20% { opacity: 1; }
+      100% { top: 90px; opacity: 0; }
+    }
+
+    .crack-fx {
+      font-size: 1.1rem;
+      animation: crackFlash 1.1s ease-in-out infinite;
+      filter: drop-shadow(0 0 4px rgba(231,76,60,0.6));
+    }
+
+    @keyframes crackFlash {
+      0%, 100% { opacity: 0.35; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.08); }
+    }
+
+    .bridge-glow-fx {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(39,174,96,0.85), rgba(39,174,96,0.05));
+      animation: bridgeGlow 2s ease-in-out infinite;
+    }
+
+    @keyframes bridgeGlow {
+      0%, 100% { transform: scale(0.85); opacity: 0.5; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+
+    .warm-dot-fx {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f9e79f;
+      box-shadow: 0 0 8px #f5b7b1;
+      animation: warmPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes warmPulse {
+      0%, 100% { transform: scale(0.8); opacity: 0.6; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+
+    .person-shake .icon-person { animation: personShake 0.35s ease-in-out infinite; }
+
+    .marker-pulse { animation: markerPulse 0.6s ease-in-out 3; }
+
+    @keyframes markerPulse {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+      50% { transform: scale(1.15); filter: drop-shadow(0 0 6px rgba(242, 155, 85, 0.8)); }
+    }
+
+    @keyframes personShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-2px); }
+      75% { transform: translateX(2px); }
+    }
+
+    .person-smile .icon-person::after {
+      content: "😊";
+      position: absolute;
+      right: -10px;
+      top: -6px;
+      font-size: 0.55rem;
+    }
+
+    .pulse-ring {
+      animation: pulseRing 2.8s ease-out infinite;
+    }
+
+    @keyframes pulseRing {
+      0% { stroke-opacity: 0.7; fill-opacity: 0.12; }
+      70% { stroke-opacity: 0.2; fill-opacity: 0.04; }
+      100% { stroke-opacity: 0.7; fill-opacity: 0.12; }
+    }
+
+    .story-typing-line {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: typingFadeIn 0.8s var(--ease) forwards;
+    }
+
+    .story-typing-line.delay-1 { animation-delay: 0.4s; }
+    .story-typing-line.delay-2 { animation-delay: 1.2s; }
+
+    @keyframes typingFadeIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .counter-roll { font-variant-numeric: tabular-nums; }
+
+    .coord-note-inline {
+      font-size: 0.62rem;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    #mapWrap .leaflet-control-zoom { display: none; }
+    #overviewMap .leaflet-control-attribution { display: none !important; }
+
+    .route-dash-flow { animation: dashFlow 1.8s linear infinite; }
+    @keyframes dashFlow { to { stroke-dashoffset: -36; } }
+
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--steel);
+    }
+
+    .leaflet-popup-content {
+      margin: 10px 12px;
+      font-size: 0.8rem;
+      line-height: 1.55;
+      min-width: 180px;
+    }
+
+    .popup-title { font-weight: 700; color: var(--steel-dark); margin-bottom: 6px; font-size: 0.88rem; }
+    .popup-title.height { color: var(--accent); }
+    .popup-title.warm { color: var(--orange); }
+
+    .leaflet-popup.popup-has-img .leaflet-popup-content-wrapper { max-width: 300px; }
+    .leaflet-popup.popup-has-img .leaflet-popup-content { min-width: 220px; max-width: 280px; margin: 8px 10px; }
+    .popup-media { margin: 0 0 8px; border-radius: 6px; overflow: hidden; line-height: 0; }
+    .popup-img { display: block; width: 100%; height: auto; max-height: 132px; object-fit: cover; }
+    .popup-text { line-height: 1.55; }
+
+    .typing-lines { margin-top: 14px; }
+    .typing-line-gradient {
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(65, 183, 166, 0.12), rgba(46, 204, 113, 0.08));
+      border-left: 3px solid var(--accent);
+      font-size: 0.92rem;
+      line-height: 1.65;
+      white-space: normal;
+    }
+    .typing-line-gradient strong {
+      font-weight: 700;
+      background: linear-gradient(90deg, #1e8449 0%, #27ae60 35%, #41b7a6 70%, #2ecc71 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    .custom-marker { background: transparent !important; border: none !important; }
+
+    .icon-pin {
+      width: 18px; height: 18px;
+      display: flex; align-items: center; justify-content: center;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));
+      line-height: 1;
+    }
+
+    .icon-car, .icon-person, .icon-glow {
+      font-size: 1rem;
+      filter: drop-shadow(0 1px 4px rgba(0,0,0,0.35));
+      line-height: 1;
+    }
+
+    /* ========== 叙事侧栏（与 test_2 一致） ========== */
+    #storyPanel {
+      width: var(--panel-w);
+      min-width: 320px;
+      flex-shrink: 0;
+      background: var(--bg-panel);
+      border-left: 1px solid #c5cdd6;
+      display: flex;
+      flex-direction: column;
+      z-index: 150;
+      box-shadow: var(--shadow);
+    }
+
+    .progress-track { height: 4px; background: #d8dde3; }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--river), var(--accent));
+      transition: width 0.55s var(--ease);
+    }
+
+    .step-nav-wrap {
+      flex-shrink: 0;
+      background: #faf9f7;
+      border-bottom: 1px solid #d0d6dc;
+      position: relative;
+    }
+
+    .step-nav-wrap::after {
+      content: "";
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 28px;
+      background: linear-gradient(90deg, transparent, #faf9f7);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    #stepNav {
+      display: flex;
+      flex-wrap: nowrap;
+      padding: 12px 14px 8px;
+      gap: 6px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .step-pill {
+      flex: 1 1 0;
+      min-width: 0;
+      border: 1px solid #d0d6dc;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 6px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .step-pill .num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--concrete);
+      color: var(--steel-dark);
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 22px;
+    }
+
+    .step-pill .lbl {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--steel-dark);
+      white-space: nowrap;
+    }
+
+    .step-pill:hover {
+      border-color: var(--river);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(61, 122, 155, 0.2);
+    }
+
+    .step-pill.active {
+      border-color: var(--rust);
+      background: #fff8f5;
+      box-shadow: 0 4px 14px rgba(184, 92, 56, 0.25);
+    }
+
+    .step-pill.active .num { background: var(--rust); color: #fff; transform: scale(1.1); }
+    .step-pill.active .lbl { color: var(--rust); }
+
+    #storyBody {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 16px 10px;
+      scrollbar-width: thin;
+    }
+
+    .story-block {
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+    }
+
+    .story-block.visible,
+    #storyBody.is-initial .story-block {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .step-badge {
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--river);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .step-title {
+      font-size: 1.28rem;
+      line-height: 1.35;
+      color: var(--steel-dark);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .step-title .accent { color: var(--accent); }
+    .step-title .warm { color: var(--orange); }
+
+    .step-text {
+      font-size: 0.9rem;
+      line-height: 1.75;
+      color: var(--muted);
+    }
+
+    .step-text p + p { margin-top: 10px; }
+    .step-text strong { color: var(--text); }
+
+    .step-meta {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: var(--concrete);
+      border-left: 3px solid var(--accent);
+      font-size: 0.8rem;
+      color: var(--steel-dark);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+    }
+
+    .step-meta.orange { border-left-color: var(--orange); }
+
+    .data-cards {
+      margin: 12px 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .data-card {
+      background: var(--concrete);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      border-left: 3px solid var(--accent);
+    }
+
+    .data-card.warn { border-left-color: var(--red); }
+    .data-card strong { display: block; font-size: 0.95rem; color: var(--steel-dark); }
+    .data-card span { font-size: 0.68rem; color: var(--muted); }
+
+    .story-data-highlight {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: linear-gradient(90deg, rgba(42, 53, 64, 0.06), rgba(65, 183, 166, 0.1));
+      border: 1px solid rgba(65, 183, 166, 0.35);
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: var(--steel-dark);
+      text-align: center;
+    }
+
+    .story-data-highlight em {
+      color: var(--accent);
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    .map-jump {
+      color: var(--river);
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      border-bottom: 1px dashed var(--river);
+    }
+
+    .map-jump:hover { color: var(--rust); border-color: var(--rust); }
+
+    .map-jump.accent {
+      color: #2a7a6e;
+      border-bottom-color: var(--accent);
+    }
+
+    .map-jump.accent:hover { color: var(--rust); border-color: var(--rust); }
+
+    .bridge-story-jump {
+      display: inline-block;
+      margin: 4px 0 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(65, 183, 166, 0.12);
+      border: 1px dashed var(--accent);
+      font-size: 0.82rem;
+      color: #2a7a6e;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .bridge-story-jump:hover {
+      background: rgba(65, 183, 166, 0.22);
+      color: var(--rust);
+      border-color: var(--rust);
+      text-decoration: underline;
+    }
+
+    .bridge-story-jump.warm {
+      background: rgba(242, 155, 85, 0.12);
+      border-color: var(--orange);
+      color: #c07030;
+    }
+
+    .bridge-story-jump.warm:hover {
+      background: rgba(242, 155, 85, 0.22);
+      color: var(--rust);
+      border-color: var(--rust);
+    }
+
+    .bridge-story-section {
+      margin: 14px 0;
+      padding: 10px 12px;
+      background: rgba(42, 53, 64, 0.04);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .bridge-story-section.warm { border-left-color: var(--orange); }
+
+    #subStoryControls {
+      display: none;
+      gap: 8px;
+      padding: 10px 14px 0;
+      align-items: center;
+      border-top: 1px dashed #d0d6dc;
+      margin-top: 4px;
+    }
+
+    #subStoryControls.visible { display: flex; }
+
+    #subStoryControls button {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: #fff;
+      color: var(--steel-dark);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.25s var(--ease);
+    }
+
+    #subStoryControls button:hover:not(:disabled) {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    #subStoryControls button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #subStoryControls.warm-theme button {
+      border-color: var(--orange);
+    }
+
+    #subStoryControls.warm-theme button:hover:not(:disabled) {
+      background: var(--orange);
+      border-color: var(--orange);
+    }
+
+    #subStoryIndicator {
+      flex: 0 0 auto;
+      font-size: 0.72rem;
+      color: var(--steel);
+      white-space: nowrap;
+      padding: 0 4px;
+    }
+
+    #storyControls {
+      display: flex;
+      gap: 8px;
+      padding: 12px 14px;
+      border-top: 1px solid #d0d6dc;
+      background: #faf9f7;
+    }
+
+    #storyControls button {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--steel);
+      background: #fff;
+      color: var(--steel-dark);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s var(--ease);
+    }
+
+    #storyControls button:hover:not(:disabled) {
+      background: var(--river);
+      color: #fff;
+      border-color: var(--river);
+    }
+
+    #storyControls button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #btnNext {
+      background: var(--rust) !important;
+      color: #fff !important;
+      border-color: var(--rust) !important;
+    }
+
+    #btnNext:hover:not(:disabled) {
+      background: #9a4a2c !important;
+      border-color: #9a4a2c !important;
+    }
+
+    @media (max-width: 860px) {
+      #appMain { flex-direction: column-reverse; }
+      #storyPanel { width: 100%; max-height: 46vh; min-width: unset; }
+      #mapWrap { min-height: 50vh; }
+      .map-legend-panel { top: auto; bottom: 120px; right: 8px; width: min(180px, 44vw); max-width: min(180px, 44vw); }
+      .anim-timer-hud { top: auto; bottom: 56px; right: 8px; max-width: calc(100% - 16px); }
+      .map-scale-home-dock { right: 8px; bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header id="pageHeader">
+    <div>
+      <h1>第四章 · 双桥故事（高度与温度）</h1>
+      <p>《云端上的桥梁——贵州“世界桥梁博物馆”时空地图》 · 从“地无三尺平”到“高速平原” · 林嘉坤</p>
+    </div>
+    <div class="header-tools">
+      <select id="basemapSelect" aria-label="底图" title="街道图 / 地形图（地势晕渲）">
+        <option value="streets-navigation-vector" selected>街道图</option>
+        <option value="terrain-relief">地形图（地势晕渲）</option>
+      </select>
+      <button type="button" id="btnReplayAnim" class="region-btn" style="padding:6px 10px;font-size:0.72rem" title="重放路径动画">
+        <i class="fa-solid fa-rotate-right"></i> 重放
+      </button>
+    </div>
+  </header>
+
+  <div id="app">
+    <div id="appMain">
+      <div id="mapWrap">
+        <div id="map"></div>
+        <div class="map-top-left-dock">
+          <div class="map-zoom-slot" aria-label="缩放">
+            <button type="button" id="btnZoomIn" title="放大">+</button>
+            <button type="button" id="btnZoomOut" title="缩小">−</button>
+          </div>
+          <div class="route-mode-toggle visible" id="routeModeToggle" aria-label="建成前后对比">
+            <button type="button" class="route-mode-btn active" data-mode="ancient" id="btnRouteAncient">🟠 建成前（古驿道/老路）</button>
+            <button type="button" class="route-mode-btn" data-mode="modern" id="btnRouteModern">🟢 建成后（现代路网）</button>
+          </div>
+          <div class="region-toggle">
+            <button type="button" class="region-btn active" data-region="huajiang" id="btnHuajiang"><i class="fa-solid fa-bridge"></i> 花江峡谷</button>
+            <button type="button" class="region-btn" data-region="beipan" id="btnBeipan"><i class="fa-solid fa-bridge"></i> 北盘江</button>
+            <button type="button" class="region-btn" data-region="yachi" id="btnYachi"><i class="fa-solid fa-bridge"></i> 鸭池河</button>
+            <button type="button" class="region-btn" data-region="baling" id="btnBaling"><i class="fa-solid fa-bridge"></i> 坝陵河</button>
+            <button type="button" class="region-btn" data-region="dushan" id="btnDushan"><i class="fa-solid fa-road"></i> 独山危桥</button>
+            <button type="button" class="region-btn" data-region="leishanSchool" id="btnLeishan"><i class="fa-solid fa-heart"></i> 雷山上学桥</button>
+            <button type="button" class="region-btn" data-region="congjiangHealth" id="btnCongjiang"><i class="fa-solid fa-heart"></i> 从江健康桥</button>
+            <button type="button" class="region-btn" data-region="all" id="btnFitAll"><i class="fa-solid fa-expand"></i> 全省总览</button>
+          </div>
+        </div>
+        <div class="map-coord-bar" id="mapCoordBar" aria-live="polite">
+          <span>经度 <span class="coord-val" id="coordLon">—</span>°</span>
+          <span style="margin: 0 10px; opacity: 0.45">|</span>
+          <span>纬度 <span class="coord-val" id="coordLat">—</span>°</span>
+        </div>
+        <div class="map-corner-dock">
+          <div class="overview-map-wrap">
+            <div class="overview-map-head">贵州省概览 · 当前范围</div>
+            <div id="overviewMap"></div>
+          </div>
+        </div>
+        <canvas id="fxCanvas" aria-hidden="true"></canvas>
+        <div class="anim-timer-hud" id="animTimerHud"><span id="animTimerLabel">通行计时</span> · <strong id="animTimerValue">00:00</strong></div>
+        <div class="map-scale-home-dock">
+          <div class="scale-bar-widget">
+            <div class="scale-bar-line"><span id="scaleLabel">—</span></div>
+          </div>
+          <button type="button" class="btn-map-home" id="btnMapHome" title="回到全省"><i class="fa-solid fa-house"></i></button>
+        </div>
+        <div class="map-legend-panel">
+          <h4><i class="fa-solid fa-layer-group"></i> 图例</h4>
+          <div class="lg-row"><span class="lg-swatch" style="background:#e74c3c;height:3px;border:1px dashed #c0392b"></span>旧路/危桥</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:#2ecc71"></span>新路/新桥</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:#f39c12;height:4px"></span>经济走廊网络（贵阳中心）</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:transparent;font-size:0.7rem">🔵</span>贵阳枢纽核心</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:transparent;font-size:0.7rem">⭐</span>故事标记（大桥）</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:transparent;font-size:0.7rem">❤️</span>故事标记（小桥）</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:rgba(184,92,56,0.45);height:10px;border:1px solid #a03720"></span>贵州省市界</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:rgba(65,183,166,0.5);height:10px;border-radius:50%"></span>桥旅辐射圈</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:rgba(46,204,113,0.25);height:10px"></span>高速平原示意</div>
+          <div class="lg-row"><span class="lg-swatch" style="background:#f9e79f;height:3px;border:1px dashed #e8c96a"></span>温情通道路径</div>
+          <p class="coord-note-inline">位置为演示示意，真实坐标以实际勘测为准</p>
+        </div>
+        <div class="map-badge" id="mapBadge"><strong>当前视点</strong> · 贵州省域总览</div>
+        <p class="map-attribution">Esri, © OpenStreetMap contributors · GeoScene 市界 · Leaflet</p>
+      </div>
+
+      <aside id="storyPanel">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="step-nav-wrap">
+          <nav id="stepNav" aria-label="章节步骤"></nav>
+        </div>
+        <div id="storyBody" class="is-initial"></div>
+        <div id="subStoryControls" aria-label="标签内故事切换">
+          <button type="button" id="btnSubStoryPrev"><i class="fa-solid fa-chevron-left"></i> 上一个故事</button>
+          <span id="subStoryIndicator">1 / 4</span>
+          <button type="button" id="btnSubStoryNext">下一个故事 <i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+        <div id="storyControls">
+          <button type="button" id="btnPrev"><i class="fa-solid fa-chevron-left"></i> 上一步</button>
+          <button type="button" id="btnNext">下一步 <i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js" crossorigin=""></script>
+  <script>
+(function () {
+  "use strict";
+
+  var COLORS = {
+    green: "#2ecc71", greenBright: "#27ae60", accent: "#41b7a6",
+    orange: "#f29b55", blue: "#233bc8", red: "#e74c3c", gray: "#95a5a6"
+  };
+
+  var LOC = {
+    bridge: [25.72, 105.62], kelizhai: [25.75, 105.58], xiaohuajiang: [25.70, 105.66],
+    yunfu: [25.73, 105.63], dushan: [25.82, 107.55], gaoqiao: [25.80, 107.52],
+    tiaodeng: [25.81, 107.54], newBridge: [25.805, 107.53], guiyang: [26.65, 106.63],
+    village: [25.79, 107.50],
+    beipan: [26.38, 104.90],
+    yachi: [26.87, 106.02],
+    baling: [25.97, 105.63],
+    leishanSchool: [26.38, 108.08],
+    congjiangHealth: [25.75, 108.88],
+    beipanGuizhou: [26.42, 104.84],
+    beipanYunnan: [26.34, 104.96],
+    yachiGuiyang: [26.92, 105.95],
+    yachiQianxi: [26.82, 106.08],
+    balingHuangguoshu: [25.99, 105.68],
+    balingScenic: [25.94, 105.58],
+    leishanVillage: [26.41, 108.05],
+    leishanOldFord: [26.395, 108.075],
+    leishanSchoolGate: [26.35, 108.12],
+    congjiangVillage: [25.78, 108.85],
+    congjiangOldFord: [25.755, 108.875],
+    congjiangClinic: [25.72, 108.92],
+    zunyi: [27.70, 106.93],
+    tongren: [27.72, 109.18],
+    bijie: [27.30, 105.29],
+    kaili: [26.58, 107.98]
+  };
+
+  /* 经济走廊网络节点坐标（示意，仅用于连线） */
+  var CORRIDOR_NODE_LL = {
+    guiyang: LOC.guiyang,
+    bridge: LOC.bridge,
+    baling: LOC.baling,
+    beipan: LOC.beipan,
+    bijie: LOC.bijie,
+    yachi: LOC.yachi,
+    zunyi: LOC.zunyi,
+    dushan: LOC.dushan,
+    kaili: LOC.kaili,
+    leishanSchool: LOC.leishanSchool,
+    tongren: LOC.tongren,
+    congjiangHealth: LOC.congjiangHealth
+  };
+
+  /* 网状连线：以贵阳为中心 + 区域互联 */
+  var CORRIDOR_EDGES = [
+    ["guiyang", "bridge"], ["guiyang", "baling"], ["guiyang", "beipan"], ["guiyang", "bijie"],
+    ["guiyang", "yachi"], ["guiyang", "zunyi"], ["guiyang", "dushan"], ["guiyang", "kaili"],
+    ["guiyang", "leishanSchool"], ["guiyang", "tongren"], ["guiyang", "congjiangHealth"],
+    ["bridge", "baling"], ["bridge", "bijie"], ["baling", "beipan"], ["baling", "yachi"],
+    ["beipan", "bijie"], ["yachi", "zunyi"], ["zunyi", "tongren"], ["zunyi", "dushan"],
+    ["dushan", "kaili"], ["kaili", "leishanSchool"], ["leishanSchool", "congjiangHealth"],
+    ["leishanSchool", "tongren"], ["tongren", "congjiangHealth"], ["kaili", "tongren"]
+  ];
+
+  var economicCorridorAnimPath = [
+    LOC.guiyang, LOC.bridge, LOC.baling, LOC.beipan, LOC.bijie, LOC.guiyang,
+    LOC.yachi, LOC.zunyi, LOC.tongren, LOC.leishanSchool, LOC.congjiangHealth,
+    LOC.dushan, LOC.kaili, LOC.guiyang
+  ];
+
+  var oldRoad = [LOC.kelizhai, [25.735, 105.595], [25.718, 105.608], [25.705, 105.615], LOC.bridge, [25.712, 105.635], [25.708, 105.655], LOC.xiaohuajiang];
+  var newRoad = [LOC.kelizhai, [25.725, 105.61], LOC.bridge, [25.715, 105.645], LOC.xiaohuajiang];
+  var villagerPath = [LOC.village, LOC.gaoqiao, LOC.tiaodeng, [25.82, 107.56]];
+  var beipanOldRoad = [LOC.beipanGuizhou, [26.40, 104.87], [26.38, 104.885], LOC.beipan, [26.36, 104.92], [26.34, 104.955], LOC.beipanYunnan];
+  var beipanNewRoad = [LOC.beipanGuizhou, [26.39, 104.89], LOC.beipan, [26.35, 104.94], LOC.beipanYunnan];
+  var yachiOldRoad = [LOC.yachiGuiyang, [26.90, 105.98], [26.88, 106.00], LOC.yachi, [26.85, 106.04], LOC.yachiQianxi];
+  var yachiNewRoad = [LOC.yachiGuiyang, [26.88, 106.01], LOC.yachi, [26.84, 106.05], LOC.yachiQianxi];
+  var balingOldRoad = [LOC.balingScenic, [25.96, 105.60], [25.975, 105.625], LOC.baling, [25.98, 105.655], LOC.balingHuangguoshu];
+  var balingNewRoad = [LOC.balingScenic, [25.965, 105.62], LOC.baling, [25.985, 105.65], LOC.balingHuangguoshu];
+  var leishanPath = [LOC.leishanVillage, LOC.leishanOldFord, LOC.leishanSchool, LOC.leishanSchoolGate];
+  var congjiangPath = [LOC.congjiangVillage, LOC.congjiangOldFord, LOC.congjiangHealth, LOC.congjiangClinic];
+
+  var BIG_BRIDGE_STORIES = {
+    bridge: {
+      oldRoad: oldRoad, newRoad: newRoad,
+      timerAncient: 120, timerModern: 8,
+      timerAncientLabel: "盘山路计时", timerModernLabel: "高速过桥计时",
+      heightLabel: "626米", heightRulerPos: [25.715, 105.619], hasWaterfall: true, waterfallPos: [25.719, 105.625]
+    },
+    beipan: {
+      oldRoad: beipanOldRoad, newRoad: beipanNewRoad,
+      timerAncient: 300, timerModern: 60,
+      timerAncientLabel: "跨省绕行（5小时）", timerModernLabel: "大桥通行（1小时）",
+      heightLabel: "565米", heightRulerPos: [26.382, 104.898], hasWaterfall: false, economicFx: "🚛"
+    },
+    yachi: {
+      oldRoad: yachiOldRoad, newRoad: yachiNewRoad,
+      timerAncient: 240, timerModern: 50,
+      timerAncientLabel: "盘江绕行（4小时）", timerModernLabel: "峡谷高速（50分钟）",
+      heightLabel: "434米", heightRulerPos: [26.868, 106.018], hasWaterfall: false, economicFx: "🍒"
+    },
+    baling: {
+      oldRoad: balingOldRoad, newRoad: balingNewRoad,
+      timerAncient: 90, timerModern: 15,
+      timerAncientLabel: "景区绕路计时", timerModernLabel: "桥旅直达计时",
+      heightLabel: "370米", heightRulerPos: [25.968, 105.628], hasWaterfall: false, economicFx: "🪂"
+    }
+  };
+
+  var WARM_BRIDGE_STORIES = {
+    dushan: { path: villagerPath, oldPoints: [LOC.gaoqiao, LOC.tiaodeng], newPoint: LOC.newBridge },
+    leishanSchool: { path: leishanPath, oldPoints: [LOC.leishanOldFord], newPoint: LOC.leishanSchool },
+    congjiangHealth: { path: congjiangPath, oldPoints: [LOC.congjiangOldFord], newPoint: LOC.congjiangHealth }
+  };
+
+  var BIG_BRIDGE_KEYS = ["bridge", "beipan", "yachi", "baling"];
+  var WARM_BRIDGE_KEYS = ["dushan", "leishanSchool", "congjiangHealth"];
+
+  var POPUP_IMAGES = {
+    bridge: "https://th.bing.com/th/id/R.2d2a9d683d12b61890041fa928a45748?rik=Y3eGjVlizNb4Hw&riu=http%3a%2f%2fwww.highestbridges.com%2fwiki%2fimages%2f4%2f49%2fHuajiangNewestRender.jpg&ehk=y7Sy%2f9ZUj1BYpjHkp2Y5GMXzic%2b8pJaS9UgqxxTBrGA%3d&risl=&pid=ImgRaw&r=0",
+    kelizhai: "https://bkimg.cdn.bcebos.com/pic/c83d70cf3bc79f3df8dce316cce8da11728b471083f6?x-bce-process=image/resize,m_lfit,w_536,limit_1/quality,Q_70",
+    xiaohuajiang: "https://th.bing.com/th/id/R.374d994ad6020fd1869d94047b98cc55?rik=fXQN0Fqfbau9sw&riu=http%3a%2f%2fgz.news.cn%2f20250608%2fdbb5d0619f024487b40576774c01bae0%2f20250608dbb5d0619f024487b40576774c01bae0_2025060832e9f93ad9434e15b4a2ddc8301cccb3.jpg&ehk=b0SR4Xr3mznhDl8eLlCNHPxUNr6md0F0dzmDuWKj6gQ%3d&risl=&pid=ImgRaw&r=0",
+    beipan: "https://th.bing.com/th/id/R.3a9069b91c4547ac6f85985f924e46e5?rik=fH0h7XRxInNCMA&riu=http%3a%2f%2fgz.news.cn%2f2023-02%2f16%2f1129369082_16765105130311n.jpg&ehk=P%2bz6m98cs7azQ5uRlnIwEmNQGd3GWFnMtHSzqx3gQB8%3d&risl=&pid=ImgRaw&r=0",
+    beipanGuizhou: "https://pic.rmb.bdstatic.com/83b8d3556cb358e2df9076b5560b90df.jpeg@s_0,w_800,h_1000,q_80,f_auto",
+    beipanYunnan: "https://tse4.mm.bing.net/th/id/OIP.V3MREnlmjOT47AVkExkAqwHaLI?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+    yachi: "https://th.bing.com/th/id/R.a2b4531b52b9893b148e021b3b4e2790?rik=7MfRpRDc4s4Fag&riu=http%3a%2f%2fn.sinaimg.cn%2fsinakd10119%2f445%2fw1200h845%2f20200314%2f6315-iquxrui2978347.jpg&ehk=NPq57I%2fMhBqau75mBr%2beSn8A%2bui5a3BOVi2vJBNK0RI%3d&risl=&pid=ImgRaw&r=0",
+    yachiGuiyang: "https://tse4.mm.bing.net/th/id/OIP.mtsf7Vr-tx5QfvUyexOo7wHaE8?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+    baling: "https://rs-channel.huanqiucdn.cn/imageDir/81c36eb88c158da8d5d09c3ac973744fu5.jpg",
+    balingScenic: "https://th.bing.com/th/id/R.94d2887d8b66b57ce468ae0775051550?rik=U7DoJ9TmKyui9Q&riu=http%3a%2f%2fszb.eyesnews.cn%2fpc%2fpic%2f202510%2f09%2f9303bf12-f129-4525-a9fe-befdc931e963.jpg.1&ehk=jqu0IiU1KxONZtKUIHKgf5ZNiN4vUev2iwQAfIEZfBs%3d&risl=&pid=ImgRaw&r=0",
+    balingHuangguoshu: "https://th.bing.com/th/id/R.fcb1fc5ed2ae2ef867d9f220b1433ded?rik=oKl3nkFT8qHIYg&riu=http%3a%2f%2fgz.news.cn%2f20250717%2f3bb58ab5798d45aba947e8d0662e5518%2f202507173bb58ab5798d45aba947e8d0662e5518_20250717fbf8b893bc2c40dda3bdbaa70767f210.jpg&ehk=cZhQ01vrg79N%2b1%2br0zHZoxHeGP9%2bliliyi%2ff5V6uk74%3d&risl=&pid=ImgRaw&r=0",
+    dushan: "https://www.httdsj.com/UploadFile/common/wechat/2022/02-10/db452657-1d0b-4a4c-8ece-2942e7af1a1a.png",
+    gaoqiao: "https://inews.gtimg.com/om_bt/O8Cvf7mqiilhSc0siUcGHJgTs-YKdipvTZbPEv97ilc_sAA/641",
+    tiaodeng: "https://inews.gtimg.com/om_bt/OEgVU_liDBAPCSeM3Op4eU06224pSoXZO2tTiKcnCi6_wAA/641",
+    leishanOldFord: "https://nfassetoss.southcn.com/__asset/5f7c34a638/a3aded4a5.jpg",
+    leishanSchool: "https://th.bing.com/th/id/R.188101d23cab9ea34b90983f6e5e02cb?rik=RNCC9gBrEj%2bmRw&riu=http%3a%2f%2fwww.china-qiao.com%2fql26%2fqdnql%2fpic_qdn%2fqdn059_10.jpg&ehk=JJYmiDKWzODYyc%2b8zrfiFX%2bPp0h9R3z071jBpspiXO4%3d&risl=&pid=ImgRaw&r=0",
+    leishanVillageLife: "https://5b0988e595225.cdn.sohucs.com/images/20190206/a8d4a4b7b3c841a59b657d594aa9b601.jpeg",
+    leishanGate: "https://th.bing.com/th/id/R.9e6df37728e5c47ad7cc8bc4afd2ae93?rik=lTzA6ttns2MJww&riu=http%3a%2f%2fvip-public.people.com.cn%2fphoto%2f2023%2f8%2f21%2f370e7a9d58a14110ae70a36ea3ac24337NsM_m.jpg&ehk=9rhOurq0aD4ulIUbAxNn%2bvwI5lqBAP7rfTWnR%2bsKRxE%3d&risl=&pid=ImgRaw&r=0",
+    congjiangHealth: "https://th.bing.com/th/id/R.cba45673c987c24f1a2f29d601113692?rik=8qVd50BwfEUGIg&riu=http%3a%2f%2fwww.china-qiao.com%2fql26%2fqdnql%2fpic_qdn%2fqdn046_03.jpg&ehk=W7XvBR9g9e%2fVX%2frlm1Zq1eWCOo%2f5LX3HHFu4N1Bx%2beY%3d&risl=&pid=ImgRaw&r=0",
+    congjiangVillageLife: "https://th.bing.com/th/id/R.f9dd66977dfd22b72f87751c7a3c582f?rik=6kavK0pXoGZ%2b4g&riu=http%3a%2f%2fwww.gz-travel.net%2flysx%2fuploadfiles_5649%2f200812%2f20081201093627263.jpg&ehk=shCKNRr8NL6awKpVMMSWrt4r%2fOjvpWr%2f1%2bohExPU0DM%3d&risl=&pid=ImgRaw&r=0"
+  };
+
+  function popupWithImg(imgKey, bodyHtml) {
+    var url = typeof imgKey === "string" && imgKey.indexOf("http") === 0 ? imgKey : POPUP_IMAGES[imgKey];
+    if (!url) return bodyHtml;
+    return "<div class='popup-media'><img class='popup-img' src='" + url + "' alt='' loading='lazy'/></div><div class='popup-text'>" + bodyHtml + "</div>";
+  }
+
+  function bindRichPopup(layer, imgKey, bodyHtml) {
+    layer.bindPopup(popupWithImg(imgKey, bodyHtml), { className: "popup-has-img", maxWidth: 300 });
+    return layer;
+  }
+
+  /* 与 test_2 一致：初始中心、市界服务、底图 */
+  var BOUNDARY_URL =
+    "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省桥梁市界/FeatureServer/1";
+  var GUIZHOU_CENTER = [27.4444, 106.9266];
+  var GUIZHOU_ZOOM = 7.35;
+  var GUIZHOU_BOUNDS = [[24.5, 103.6], [29.3, 109.6]];
+  var AGOL = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+  var DEFAULT_BASEMAP_KEY = "streets-navigation-vector";
+  var boundaryLayer = null;
+  var overviewBoundaryLayer = null;
+  var currentBasemapKey = DEFAULT_BASEMAP_KEY;
+
+  var STEPS = [
+    {
+      id: "story1",
+      pill: "高度",
+      badge: "故事一 · 高度",
+      title: '<span class="accent">花江峡谷大桥</span> —— 世界第一高桥的领头力量',
+      region: "huajiang",
+      mapLabel: "花江峡谷 · 高度",
+      cards: [
+        { value: "626m", label: "桥面距水面", warn: false, counter: null },
+        { value: "1420m", label: "主跨", warn: false, counter: null },
+        { value: "2025.9.28", label: "通车", warn: false, counter: null },
+        { value: "1万+", label: "日车流（科力寨）", warn: false, counter: 10000 }
+      ],
+      body: [
+        "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"bridge\" href=\"#\">花江峡谷大桥</a>，桥面距水面626米，主跨1420米，2025年9月28日通车，<strong>横竖都是世界第一</strong>。它不仅是贵州“高速平原”的皇冠明珠，更是西部陆海新通道的关键节点。</p>",
+        "<a class=\"bridge-story-jump map-jump\" data-target=\"bridge\" href=\"#\">《花江峡谷大桥：世界第一高桥》</a>",
+        "<p><strong>通行之变：</strong>过去，两岸村民绕行盘山路需要2个多小时；如今，驾车过桥仅需5—10分钟。<strong>时间被折叠，距离被拉近。</strong>左上角可切换「建成前/建成后」对比动画与计时。</p>",
+        "<p><strong>桥旅融合：</strong><a class=\"map-jump\" data-target=\"yunfu\" href=\"#\">云渡服务区</a>集桥梁博物馆、悬崖酒店、竞速跑道、200米观光电梯于一体。桥下4000m³蓄水池打造的300米宽水幕从625米高空落下，成为<strong>全球最高人工瀑布</strong>。</p>",
+        "<p><strong>村庄之变：</strong><a class=\"map-jump\" data-target=\"kelizhai\" href=\"#\">科力寨（五里村）</a>：25户128人的仡佬族村寨，因拍摄大桥的最佳视角而走红。2025年“十一”假期，日车流超过1万辆。</p>",
+        "<p><a class=\"map-jump\" data-target=\"xiaohuajiang\" href=\"#\">小花江村</a>：民宿农家乐满房，年轻人纷纷返乡创业。布依蜡染传承人韦奶奶说：“桥通了，游客来了，我的手艺又能传给下一代了。”</p>",
+        "<div class=\"bridge-story-section\"><p><strong>🔥 北盘江大桥（都格镇）</strong> · 高度 <strong>565米</strong>（曾是世界第一高桥）<br>2016年12月29日通车，连接贵州与云南，车程从<strong>5小时缩短到1小时</strong>。通车前两岸村民隔江相望，探亲需绕行一整天；桥通后步行10分钟就能走亲戚。<strong>一座桥，拉近了两省的距离，更拉近了人的距离。</strong></p><a class=\"bridge-story-jump map-jump\" data-target=\"beipan\" href=\"#\">《北盘江大桥：跨省通途》</a></div>",
+        "<div class=\"bridge-story-section\"><p><strong>🔥 鸭池河大桥</strong> · 高度 <strong>434米</strong>（世界第二高桥）· 主跨800米<br>2016年7月16日通车，贵阳至黔西车程从<strong>4小时缩短到50分钟</strong>。峡谷风大雾多，中国工程师用钢桁梁加劲梁结构征服天险。今天，当地果农的樱桃、李子能快速运往贵阳，<strong>一斤能多卖5块钱</strong>。</p><a class=\"bridge-story-jump map-jump\" data-target=\"yachi\" href=\"#\">《鸭池河大桥：峡谷飞虹》</a></div>",
+        "<div class=\"bridge-story-section\"><p><strong>🔥 坝陵河大桥</strong> · 高度 <strong>370米</strong> · 主跨1088米<br>2009年12月23日通车，贵州第一座超级大桥，开创<strong>桥旅融合</strong>先河。桥上有蹦极项目（世界最高商业蹦极370米），桥下毗邻黄果树景区。<strong>一座桥成了一个景区</strong>，带动周边餐饮、民宿全面升级。</p><a class=\"bridge-story-jump map-jump\" data-target=\"baling\" href=\"#\">《坝陵河大桥：桥旅融合开创者》</a></div>",
+        "<p><strong>领头意义：</strong>从花江峡谷到北盘江、鸭池河、坝陵河，贵州大桥<strong>领发展、串走廊</strong>。地图上金色网络以<strong>贵阳为中心</strong>辐射全省，节点可点击查看介绍（示意坐标）。</p>"
+      ],
+      meta: "点击绿色故事链接跳转地图、播放动画并弹出故事；可切换建成前/建成后对比。",
+      metaClass: ""
+    },
+    {
+      id: "story2",
+      pill: "温度",
+      badge: "故事二 · 温度",
+      title: '<span class="warm">独山危桥改造</span> —— 2.8万座桥中的“温度”',
+      region: "dushan",
+      mapLabel: "独山危桥 · 温度",
+      cards: [
+        { value: "2.8万座", label: "贵州桥梁总数", warn: false },
+        { value: "8座", label: "独山危桥改造", warn: false },
+        { value: "1344万", label: "总投资（元）", warn: false, counter: 13440000 },
+        { value: "1/25", label: "洪水设计频率", warn: false }
+      ],
+      body: [
+        "<p><strong>开篇：</strong>贵州有2.8万座桥梁，花江峡谷是其中最高的一座，但更多的是像独山县麻万镇三里村这样的“小桥”——它们不高、不大，却是村民<strong>赶集、上学、就医的必经之路</strong>。</p>",
+        "<a class=\"bridge-story-jump warm map-jump\" data-target=\"dushan\" href=\"#\">《独山危桥改造：1344万换安心》</a>",
+        "<p><strong>改造前·危桥之痛：</strong><a class=\"map-jump\" data-target=\"gaoqiao\" href=\"#\">高桥</a>和<a class=\"map-jump\" data-target=\"tiaodeng\" href=\"#\">跳等桥</a>联通独山与都匀墨冲镇。桥面裂缝明显，承载不足，雨季河水暴涨，村民过桥总是提心吊胆。“一到下雨天，我们不敢让娃娃去上学。”村民李大姐回忆道。</p>",
+        "<p><strong>改造中·1344万：</strong>2025年，独山县启动8座危桥改造工程，总投资1344万元。原桥位拆除重建，采用差异化荷载标准（公路-I级 / 公路-Ⅱ级），洪水频率提高到1/25。<strong>每一分钱，都花在百姓的心坎上。</strong></p>",
+        "<p><strong>改造后·安心之桥：</strong>新桥通车那天，村里老人说：“这辈子终于不用怕过桥了。”现在，孩子们蹦蹦跳跳去上学，老人赶集不再凌晨出发，货车可以开到村口。<strong>一座小桥，温暖了一个村庄。</strong></p>",
+        "<div class=\"bridge-story-section warm\"><p><strong>❤️ 雷山县·上学桥</strong>（人行便桥）<br>改造前：木栈道与几根原木，雨季常被冲毁，学生<strong>脱鞋蹚水过河</strong>。2023年修起宽1.5米水泥桥，有护栏，全天候安全通行。孩子们终于可以<strong>穿着干爽的鞋蹦蹦跳跳去上学</strong>。桥不大，却托起<strong>12个孩子的求学梦</strong>。</p><a class=\"bridge-story-jump warm map-jump\" data-target=\"leishanSchool\" href=\"#\">《雷山上学桥：12个孩子的求学梦》</a></div>",
+        "<div class=\"bridge-story-section warm\"><p><strong>❤️ 从江县·健康桥</strong>（车行小桥）<br>改造前：危桥限重1吨，救护车无法通过，病人需<strong>人抬过桥</strong>。2024年冬天，一位老人突发心梗，家人在寒风中抬担架走了2公里才送上救护车。新桥通车那天，全村人自发到桥上放鞭炮：<strong>这不仅是桥，是救命的路</strong>。</p><a class=\"bridge-story-jump warm map-jump\" data-target=\"congjiangHealth\" href=\"#\">《从江健康桥：一条救命的通道》</a></div>",
+        "<p><strong>温度的意义：</strong>花江峡谷代表“高度”，独山与雷山、从江的小桥代表“温度”。<strong>大桥领发展，小桥连人心。</strong>左上角切换「建成前/建成后」观看村民过桥动画。</p>"
+      ],
+      meta: "点击橙色故事链接跳转地图、播放温情动画并弹出故事；可切换建成前/建成后对比。",
+      metaClass: "orange"
+    },
+    {
+      id: "summary",
+      pill: "结语",
+      badge: "第四章 · 结语",
+      title: "大桥与小桥，都是连接的纽带",
+      region: "all",
+      mapLabel: "贵州省域总览",
+      cards: [
+        { value: "2.8万+", label: "贵州桥梁总数", warn: false },
+        { value: "626m", label: "最高桥·花江峡谷", warn: false },
+        { value: "12", label: "上学桥受益学生", warn: false },
+        { value: "1344万", label: "独山改造投资", warn: false, counter: 13440000 }
+      ],
+      body: [
+        "<p><strong>回望本章：</strong>从<strong>花江峡谷大桥</strong>到<strong>独山三里危桥</strong>，从<strong>北盘江、鸭池河、坝陵河</strong>到<strong>雷山上学桥、从江健康桥</strong>，贵州的桥梁既有托举“高速平原”的<strong>世界第一高度</strong>，也有连接万家灯火的<strong>一梁一温度</strong>。</p>",
+        "<p><strong>高度·领发展：</strong>超级大桥串起<strong>西部陆海新通道</strong>与<strong>桥旅融合</strong>，让时间被折叠、市场被拉近。花江峡谷领世界之最，北盘江连黔滇，鸭池河通物流，坝陵河开桥旅——<strong>大桥是贵州走向现代化的脊梁</strong>。</p>",
+        "<p><strong>温度·连人心：</strong>2.8万座桥里，更多的是看不见名字的小桥。独山1344万换安心，雷山12个孩子穿上干爽的鞋，从江健康桥让救护车开进侗寨——<strong>小桥不高不大，却连着上学、赶集、就医的每一天</strong>。</p>",
+        "<p><strong>走廊·串希望：</strong>以<strong>贵阳</strong>为中心的金色经济走廊示意网络，把大桥与小桥织成一张网。桥接桥，串起<strong>发展与希望</strong>；桥连桥，温暖<strong>翻山越岭的每一个人</strong>。</p>",
+        "<p><strong>文化·共传承：</strong>仡佬族蜡染、布依族村寨、苗族飞歌、侗族大歌……桥不仅通车通路，更让<strong>非遗、节庆与乡土记忆</strong>在新时代继续流传。</p>",
+        "<p><strong>结语：</strong>贵州从“地无三尺平”到“高速平原”，桥梁是<strong>最可见、最可感的变革符号</strong>。<strong>大桥领发展，小桥连人心</strong>——每一座桥，都是连接过去与未来、高山与平原、发展与人心的纽带。</p>"
+      ],
+      highlight: null,
+      typingLines: [
+        "大桥领发展，小桥连人心 桥接桥，串起经济走廊与万家灯火；桥连桥，温暖每一个翻山越岭的人"
+      ],
+      meta: "本章地图上的符号与线路均可点击查看更丰富的桥梁故事（示意坐标）。"
+    }
+  ];
+
+  var SUB_STORIES = {
+    story1: [
+      {
+        key: "bridge",
+        badge: "故事一 · 高度 · 1/4",
+        title: '<span class="accent">花江峡谷大桥</span> —— 世界第一高桥的领头力量',
+        cards: [
+          { value: "626m", label: "桥面距水面", warn: false },
+          { value: "1420m", label: "主跨", warn: false },
+          { value: "2025.9.28", label: "通车", warn: false },
+          { value: "1万+", label: "日车流（科力寨）", warn: false, counter: 10000 }
+        ],
+        body: [
+          "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"bridge\" href=\"#\">花江峡谷大桥</a>，桥面距水面626米，主跨1420米，2025年9月28日通车，<strong>横竖都是世界第一</strong>。它不仅是贵州“高速平原”的皇冠明珠，更是西部陆海新通道的关键节点。</p>",
+          "<p><strong>通行之变：</strong>过去，两岸村民绕行盘山路需要2个多小时；如今，驾车过桥仅需5—10分钟。<strong>时间被折叠，距离被拉近。</strong>左上角可切换「建成前/建成后」对比动画与计时。</p>",
+          "<p><strong>桥旅融合：</strong><a class=\"map-jump\" data-target=\"yunfu\" href=\"#\">云渡服务区</a>集桥梁博物馆、悬崖酒店、竞速跑道、200米观光电梯于一体。桥下4000m³蓄水池打造的300米宽水幕从625米高空落下，成为<strong>全球最高人工瀑布</strong>。</p>",
+          "<p><strong>村庄之变：</strong><a class=\"map-jump\" data-target=\"kelizhai\" href=\"#\">科力寨（五里村）</a>：25户128人的仡佬族村寨，因拍摄大桥的最佳视角而走红。2025年“十一”假期，日车流超过1万辆。</p>",
+          "<p><a class=\"map-jump\" data-target=\"xiaohuajiang\" href=\"#\">小花江村</a>：民宿农家乐满房，年轻人纷纷返乡创业。布依蜡染传承人韦奶奶说：“桥通了，游客来了，我的手艺又能传给下一代了。”</p>",
+          "<p><strong>领头意义：</strong>花江峡谷以“高度”领路，托举贵州桥旅融合与西部陆海新通道建设，是标签一“大桥领发展”的标杆故事。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它大桥；可切换建成前/建成后对比。",
+        metaClass: ""
+      },
+      {
+        key: "beipan",
+        badge: "故事一 · 高度 · 2/4",
+        title: '<span class="accent">北盘江大桥</span> —— 跨省通途的经济纽带',
+        cards: [
+          { value: "565m", label: "桥面高度", warn: false },
+          { value: "2016.12", label: "通车", warn: false },
+          { value: "5h→1h", label: "跨省车程", warn: false },
+          { value: "2省", label: "黔滇直连", warn: false }
+        ],
+        body: [
+          "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"beipan\" href=\"#\">北盘江大桥</a>位于<a class=\"map-jump accent\" data-target=\"beipanGuizhou\" href=\"#\">都格镇·贵州侧</a>，桥面距江面565米，曾是世界第一高桥。2016年12月29日通车，<strong>一桥飞架南北</strong>，贵州与云南从此近若邻邦。</p>",
+          "<p><strong>通行之变：</strong>通车前两岸村民隔江相望，探亲需绕行一整天；桥通后车程从<strong>5小时缩短到1小时</strong>，步行10分钟就能到<a class=\"map-jump accent\" data-target=\"beipanYunnan\" href=\"#\">对岸云南</a>走亲戚。</p>",
+          "<p><strong>经济之便：</strong>西部陆海新通道上的关键节点，煤炭、果蔬、建材经此快速流通。<a class=\"map-jump accent\" data-target=\"beipanGuizhou\" href=\"#\">都格镇集市</a>日交易额较通车前<strong>翻了两番</strong>，彝族火把节、苗族芦笙节的物资也经此互通。</p>",
+          "<p><strong>文化之桥：</strong>北盘江两岸聚居着彝族、苗族、布依族群众，大桥让“赶场天”不再翻山越岭，也让非遗手工艺品更容易走出大山。</p>",
+          "<p><strong>领头意义：</strong>北盘江以“跨省通途”诠释大桥领发展——<strong>时间被折叠，市场被拉近</strong>。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它大桥；可切换建成前/建成后对比。",
+        metaClass: ""
+      },
+      {
+        key: "yachi",
+        badge: "故事一 · 高度 · 3/4",
+        title: '<span class="accent">鸭池河大桥</span> —— 峡谷飞虹的物流动脉',
+        cards: [
+          { value: "434m", label: "桥面高度", warn: false },
+          { value: "800m", label: "主跨", warn: false },
+          { value: "4h→50m", label: "贵阳至黔西", warn: false },
+          { value: "+5元", label: "鲜果溢价/斤", warn: false }
+        ],
+        body: [
+          "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"yachi\" href=\"#\">鸭池河大桥</a>桥面距水面434米，主跨800米，2016年7月16日通车，是世界第二高桥。峡谷风大雾多，中国工程师用钢桁梁加劲梁结构征服天险。</p>",
+          "<p><strong>通行之变：</strong><a class=\"map-jump accent\" data-target=\"yachiGuiyang\" href=\"#\">贵阳方向</a>至<a class=\"map-jump accent\" data-target=\"yachiQianxi\" href=\"#\">黔西</a>车程从<strong>4小时缩短到50分钟</strong>，乌蒙山区与黔中平原被一条“空中走廊”紧紧相连。</p>",
+          "<p><strong>经济之便：</strong><a class=\"map-jump accent\" data-target=\"yachiQianxi\" href=\"#\">黔西果园</a>的樱桃、李子能快速运往贵阳，<strong>一斤能多卖5块钱</strong>。曾经“烂在山里”的鲜果，如今当天就能出现在省城超市。</p>",
+          "<p><strong>文化之便：</strong>黔西彝族、苗族节庆物资经大桥快进快出，非遗展演与农特产品同路而行，峡谷天险变成了<strong>致富通途</strong>。</p>",
+          "<p><strong>领头意义：</strong>鸭池河大桥让“峡谷飞虹”成为贵州桥梁工业化的名片，<strong>便捷物流托举一方产业</strong>。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它大桥；可切换建成前/建成后对比。",
+        metaClass: ""
+      },
+      {
+        key: "baling",
+        badge: "故事一 · 高度 · 4/4",
+        title: '<span class="accent">坝陵河大桥</span> —— 桥旅融合的开创者',
+        cards: [
+          { value: "370m", label: "桥面高度", warn: false },
+          { value: "1088m", label: "主跨", warn: false },
+          { value: "2009.12", label: "通车", warn: false },
+          { value: "370m", label: "商业蹦极", warn: false }
+        ],
+        body: [
+          "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"baling\" href=\"#\">坝陵河大桥</a>桥面距水面370米，主跨1088米，2009年12月23日通车，是贵州第一座超级大桥，<strong>开创桥旅融合先河</strong>。</p>",
+          "<p><strong>通行之变：</strong>景区绕路变为桥旅直达，通往<a class=\"map-jump accent\" data-target=\"balingHuangguoshu\" href=\"#\">黄果树</a>方向的通行时间大幅缩短，游客流量显著增加。</p>",
+          "<p><strong>经济之便：</strong><a class=\"map-jump accent\" data-target=\"balingScenic\" href=\"#\">桥旅体验区</a>有世界最高商业蹦极370米，桥下毗邻黄果树景区。<strong>一座桥成了一个景区</strong>，带动周边餐饮、民宿全面升级。</p>",
+          "<p><strong>文化之便：</strong>布依族、苗族游客经大桥涌入，蜡染、银饰与桥旅体验结合，形成<strong>“桥+旅+文”</strong>的贵州样板。</p>",
+          "<p><strong>领头意义：</strong>坝陵河大桥证明：大桥不仅能领发展，还能<strong>领旅游、领消费</strong>，是经济走廊上的文旅节点。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它大桥；可切换建成前/建成后对比。",
+        metaClass: ""
+      }
+    ],
+    story2: [
+      {
+        key: "dushan",
+        badge: "故事二 · 温度 · 1/3",
+        title: '<span class="warm">独山危桥改造</span> —— 2.8万座桥中的“温度”',
+        cards: [
+          { value: "2.8万座", label: "贵州桥梁总数", warn: false },
+          { value: "8座", label: "独山危桥改造", warn: false },
+          { value: "1344万", label: "总投资（元）", warn: false, counter: 13440000 },
+          { value: "1/25", label: "洪水设计频率", warn: false }
+        ],
+        body: [
+          "<p><strong>开篇：</strong>贵州有2.8万座桥梁，花江峡谷是其中最高的一座，但更多的是像<a class=\"map-jump\" data-target=\"dushan\" href=\"#\">独山县麻万镇三里村</a>这样的“小桥”——它们不高、不大，却是村民<strong>赶集、上学、就医的必经之路</strong>。</p>",
+          "<p><strong>改造前·危桥之痛：</strong><a class=\"map-jump\" data-target=\"gaoqiao\" href=\"#\">高桥</a>和<a class=\"map-jump\" data-target=\"tiaodeng\" href=\"#\">跳等桥</a>联通独山与都匀墨冲镇。桥面裂缝明显，承载不足，雨季河水暴涨，村民过桥总是提心吊胆。“一到下雨天，我们不敢让娃娃去上学。”村民李大姐回忆道。</p>",
+          "<p><strong>改造中·1344万：</strong>2025年，独山县启动8座危桥改造工程，总投资1344万元。原桥位拆除重建，采用差异化荷载标准（公路-I级 / 公路-Ⅱ级），洪水频率提高到1/25。<strong>每一分钱，都花在百姓的心坎上。</strong></p>",
+          "<p><strong>改造后·安心之桥：</strong>新桥通车那天，村里老人说：“这辈子终于不用怕过桥了。”现在，孩子们蹦蹦跳跳去上学，老人赶集不再凌晨出发，货车可以开到村口。<strong>一座小桥，温暖了一个村庄。</strong></p>",
+          "<p><strong>温度意义：</strong>独山危桥改造是标签二“小桥连人心”的缩影——<strong>不高不大，却连着万家灯火</strong>。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它小桥；可切换建成前/建成后对比。",
+        metaClass: "orange"
+      },
+      {
+        key: "leishanSchool",
+        badge: "故事二 · 温度 · 2/3",
+        title: '<span class="warm">雷山县·上学桥</span> —— 12个孩子的求学梦',
+        cards: [
+          { value: "1.5m", label: "桥面宽度", warn: false },
+          { value: "2023", label: "改造通车", warn: false },
+          { value: "12", label: "受益学生", warn: false },
+          { value: "人行", label: "便桥类型", warn: false }
+        ],
+        body: [
+          "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"leishanSchool\" href=\"#\">雷山县·上学桥</a>是一座人行便桥，连接<a class=\"map-jump accent\" data-target=\"leishanVillageLife\" href=\"#\">苗寨</a>与<a class=\"map-jump accent\" data-target=\"leishanGate\" href=\"#\">村小</a>。改造前是木栈道与几根原木，雨季常被冲毁，学生<strong>脱鞋蹚水过河</strong>。</p>",
+          "<p><strong>改造前·求学之难：</strong>苗族「飞歌」传唱的村寨里，孩子们常常湿着脚进教室。家长说：“一涨水，我们就得绕远路，娃娃上学要早起两小时。”<a class=\"map-jump accent\" data-target=\"leishanOldFord\" href=\"#\">旧渡点</a>每逢雨季便成险境。</p>",
+          "<p><strong>改造中·2023：</strong>修起宽1.5米水泥桥，有护栏，全天候安全通行。工程不大，却精准回应<strong>上学这一件大事</strong>。</p>",
+          "<p><strong>改造后·干爽的路：</strong>孩子们终于可以<strong>穿着干爽的鞋蹦蹦跳跳去上学</strong>。桥不大，却托起<strong>12个孩子的求学梦</strong>。</p>",
+          "<p><strong>温度意义：</strong>上学桥诠释“小桥连人心”——<strong>每一座小桥，都连着下一代的未来</strong>。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它小桥；可切换建成前/建成后对比。",
+        metaClass: "orange"
+      },
+      {
+        key: "congjiangHealth",
+        badge: "故事二 · 温度 · 3/3",
+        title: '<span class="warm">从江县·健康桥</span> —— 一条救命的通道',
+        cards: [
+          { value: "1吨", label: "旧桥限重", warn: true },
+          { value: "2024", label: "新桥通车", warn: false },
+          { value: "救护车", label: "可通行", warn: false },
+          { value: "侗寨", label: "受益村寨", warn: false }
+        ],
+        body: [
+          "<p><strong>开篇：</strong><a class=\"map-jump\" data-target=\"congjiangHealth\" href=\"#\">从江县·健康桥</a>是一座车行小桥，连接<a class=\"map-jump accent\" data-target=\"congjiangVillageLife\" href=\"#\">侗寨</a>与<a class=\"map-jump accent\" data-target=\"congjiangClinicPt\" href=\"#\">乡卫生院</a>方向。改造前<a class=\"map-jump accent\" data-target=\"congjiangOldFord\" href=\"#\">旧桥</a>限重1吨，救护车无法通过，病人需<strong>人抬过桥</strong>。</p>",
+          "<p><strong>改造前·就医之难：</strong>2024年冬天，一位老人突发心梗，家人在寒风中抬担架走了2公里才送上救护车。侗族大歌之乡的宁静夜里，多了许多<strong>令人揪心的等待</strong>。</p>",
+          "<p><strong>改造中·2024：</strong>原桥位拆除重建，荷载满足急救车辆通行。工程投资不大，却直指<strong>生命通道</strong>这一核心需求。</p>",
+          "<p><strong>改造后·救命的路：</strong>新桥通车那天，全村人自发到桥上放鞭炮：<strong>这不仅是桥，是救命的路</strong>。急救车可直接开到<a class=\"map-jump accent\" data-target=\"congjiangClinicPt\" href=\"#\">卫生院</a>。</p>",
+          "<p><strong>温度意义：</strong>健康桥让“小桥连人心”有了最具体的含义——<strong>连的是生命，暖的是民心</strong>。</p>"
+        ],
+        meta: "使用下方「上一个/下一个故事」切换同标签内其它小桥；可切换建成前/建成后对比。",
+        metaClass: "orange"
+      }
+    ]
+  };
+
+  var REGION_STORY_MAP = {
+    huajiang: { step: 0, sub: 0 },
+    beipan: { step: 0, sub: 1 },
+    yachi: { step: 0, sub: 2 },
+    baling: { step: 0, sub: 3 },
+    dushan: { step: 1, sub: 0 },
+    leishanSchool: { step: 1, sub: 1 },
+    congjiangHealth: { step: 1, sub: 2 }
+  };
+
+  var el = {
+    storyBody: document.getElementById("storyBody"),
+    stepNav: document.getElementById("stepNav"),
+    progressFill: document.getElementById("progressFill"),
+    btnPrev: document.getElementById("btnPrev"),
+    btnNext: document.getElementById("btnNext"),
+    subStoryControls: document.getElementById("subStoryControls"),
+    btnSubStoryPrev: document.getElementById("btnSubStoryPrev"),
+    btnSubStoryNext: document.getElementById("btnSubStoryNext"),
+    subStoryIndicator: document.getElementById("subStoryIndicator"),
+    mapBadge: document.getElementById("mapBadge"),
+    coordLon: document.getElementById("coordLon"),
+    coordLat: document.getElementById("coordLat"),
+    scaleLabel: document.getElementById("scaleLabel"),
+    animTimerHud: document.getElementById("animTimerHud"),
+    animTimerLabel: document.getElementById("animTimerLabel"),
+    animTimerValue: document.getElementById("animTimerValue"),
+    routeModeToggle: document.getElementById("routeModeToggle"),
+    fxCanvas: document.getElementById("fxCanvas")
+  };
+
+  var currentIndex = 0;
+  var subStoryIndex = 0;
+  var routeMode = "ancient";
+  var baseLayers = {};
+  var overviewBaseLayers = {};
+  var map, overviewMap, overviewRect;
+  var layers, markers, animMarkers, fxMarkers, animRafIds = {};
+  var villagerOldLine, villagerNewLine, oldRoadLine, newRoadLine, warmPathLine;
+  var bridgeRouteLines = {};
+  var warmBridgeLines = {};
+  var corridorLinesGroup;
+  var pulseCircles = [];
+  var warmDotMarkers = [];
+  var warmDotMarkersByStory = {};
+  var activeMapStory = "bridge";
+  var timerRafId = null;
+  var fxCtx = null;
+
+  var pulseRafId = null;
+
+  var SCALE_BAR_PX = 80;
+  var DUSHAN_SCALE_KM = 1.4;
+
+  function zoomForScaleBarKm(lat, km) {
+    var metersPerPixel = (km * 1000) / SCALE_BAR_PX;
+    var zoom = Math.log2(156543.03392 * Math.cos(lat * Math.PI / 180) / metersPerPixel);
+    return Math.max(7, Math.min(22, Math.round(zoom * 100) / 100));
+  }
+
+  function getDushanViewCenter() {
+    var lats = [], lngs = [];
+    villagerPath.forEach(function (p) { lats.push(p[0]); lngs.push(p[1]); });
+    [LOC.gaoqiao, LOC.tiaodeng, LOC.newBridge].forEach(function (p) {
+      lats.push(p[0]); lngs.push(p[1]);
+    });
+    return [
+      (Math.min.apply(null, lats) + Math.max.apply(null, lats)) / 2,
+      (Math.min.apply(null, lngs) + Math.max.apply(null, lngs)) / 2
+    ];
+  }
+
+  function flyToDushanAtScale() {
+    var center = getDushanViewCenter();
+    var zoom = zoomForScaleBarKm(center[0], DUSHAN_SCALE_KM);
+    map.flyTo(center, zoom, { duration: 1.2 });
+  }
+
+  function runCounterAnims() {
+    el.storyBody.querySelectorAll(".counter-roll").forEach(function (node) {
+      var target = parseInt(node.getAttribute("data-counter"), 10);
+      var startTs = null;
+      function frame(ts) {
+        if (!startTs) startTs = ts;
+        var p = Math.min(1, (ts - startTs) / 1500);
+        var val = Math.floor(target * p);
+        if (target >= 1000000) node.textContent = Math.floor(val / 10000) + "万";
+        else if (target >= 10000) node.textContent = (val / 10000).toFixed(1).replace(/\.0$/, "") + "万+";
+        else node.textContent = String(val);
+        if (p < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function updateRouteModeVisibility(step) {
+    if (!el.routeModeToggle) return;
+    el.routeModeToggle.classList.toggle("visible", step && (step.id === "story1" || step.id === "story2"));
+  }
+
+  function setRouteModeButtons(mode) {
+    document.querySelectorAll(".route-mode-btn").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-mode") === mode);
+    });
+  }
+
+  function highlightMarker(marker) {
+    if (!marker) return;
+    var elmk = marker.getElement();
+    if (elmk) {
+      elmk.classList.add("marker-pulse");
+      setTimeout(function () { elmk.classList.remove("marker-pulse"); }, 2400);
+    }
+    marker.openPopup();
+  }
+
+  function setFxLayerVisible(visible) {
+    if (!layers || !layers.fx) return;
+    if (visible) { if (!map.hasLayer(layers.fx)) map.addLayer(layers.fx); }
+    else if (map.hasLayer(layers.fx)) map.removeLayer(layers.fx);
+  }
+
+  function setPulseRingsAt(center) {
+    pulseCircles.forEach(function (circle) { circle.setLatLng(center); });
+  }
+
+  function isBigBridgeKey(key) {
+    return BIG_BRIDGE_STORIES.hasOwnProperty(key);
+  }
+
+  function isWarmBridgeKey(key) {
+    return WARM_BRIDGE_STORIES.hasOwnProperty(key);
+  }
+
+  function hideAllBigBridgeLines() {
+    BIG_BRIDGE_KEYS.forEach(function (key) {
+      var lines = bridgeRouteLines[key];
+      if (!lines) return;
+      if (lines.oldLine && layers.routes.hasLayer(lines.oldLine)) layers.routes.removeLayer(lines.oldLine);
+      if (lines.newLine && layers.routes.hasLayer(lines.newLine)) layers.routes.removeLayer(lines.newLine);
+    });
+  }
+
+  function showBigBridgeLines(key, isAncient) {
+    hideAllBigBridgeLines();
+    var lines = bridgeRouteLines[key];
+    if (!lines) return;
+    var active = isAncient ? lines.oldLine : lines.newLine;
+    var inactive = isAncient ? lines.newLine : lines.oldLine;
+    if (active && !layers.routes.hasLayer(active)) layers.routes.addLayer(active);
+    if (inactive && layers.routes.hasLayer(inactive)) layers.routes.removeLayer(inactive);
+    if (lines.oldLine) lines.oldLine.setStyle({ opacity: isAncient ? 1 : 0.35, weight: isAncient ? 5 : 3 });
+    if (lines.newLine) lines.newLine.setStyle({ opacity: isAncient ? 0.35 : 1, weight: isAncient ? 3 : 5 });
+  }
+
+  function hideAllWarmBridgeLines() {
+    WARM_BRIDGE_KEYS.forEach(function (key) {
+      var lines = warmBridgeLines[key];
+      if (!lines) return;
+      if (lines.oldLine && layers.routes.hasLayer(lines.oldLine)) layers.routes.removeLayer(lines.oldLine);
+      if (lines.newLine && layers.routes.hasLayer(lines.newLine)) layers.routes.removeLayer(lines.newLine);
+      if (lines.warmPathLine && layers.routes.hasLayer(lines.warmPathLine)) layers.routes.removeLayer(lines.warmPathLine);
+    });
+  }
+
+  function showWarmBridgeLines(key, isAncient) {
+    hideAllWarmBridgeLines();
+    var lines = warmBridgeLines[key];
+    if (!lines) return;
+  if (isAncient) {
+      if (lines.oldLine && !layers.routes.hasLayer(lines.oldLine)) layers.routes.addLayer(lines.oldLine);
+      if (lines.newLine && layers.routes.hasLayer(lines.newLine)) layers.routes.removeLayer(lines.newLine);
+    } else {
+      if (lines.oldLine && layers.routes.hasLayer(lines.oldLine)) layers.routes.removeLayer(lines.oldLine);
+      if (lines.newLine && !layers.routes.hasLayer(lines.newLine)) layers.routes.addLayer(lines.newLine);
+    }
+    if (lines.warmPathLine && !layers.routes.hasLayer(lines.warmPathLine)) {
+      layers.routes.addLayer(lines.warmPathLine);
+      lines.warmPathLine.bringToFront();
+    }
+  }
+
+  function hideAllWarmBridgeMarkers() {
+    [markers.gaoqiaoDanger, markers.tiaodengDanger, markers.gaoqiaoOk, markers.tiaodengOk, markers.newBridgeOk,
+      markers.leishanOldDanger, markers.leishanNewOk, markers.congjiangOldDanger, markers.congjiangNewOk].forEach(function (m) {
+      if (m && layers.points.hasLayer(m)) layers.points.removeLayer(m);
+    });
+  }
+
+  function updateWarmBridgeMarkers(key, isAncient) {
+    if (key === "dushan") {
+      [markers.gaoqiaoDanger, markers.tiaodengDanger].forEach(function (m) {
+        if (isAncient) { if (!layers.points.hasLayer(m)) layers.points.addLayer(m); }
+        else if (layers.points.hasLayer(m)) layers.points.removeLayer(m);
+      });
+      [markers.gaoqiaoOk, markers.tiaodengOk, markers.newBridgeOk].forEach(function (m) {
+        if (isAncient) { if (layers.points.hasLayer(m)) layers.points.removeLayer(m); }
+        else if (!layers.points.hasLayer(m)) layers.points.addLayer(m);
+      });
+      return;
+    }
+    if (key === "leishanSchool") {
+      [markers.leishanOldDanger].forEach(function (m) {
+        if (isAncient) { if (!layers.points.hasLayer(m)) layers.points.addLayer(m); }
+        else if (layers.points.hasLayer(m)) layers.points.removeLayer(m);
+      });
+      [markers.leishanNewOk].forEach(function (m) {
+        if (isAncient) { if (layers.points.hasLayer(m)) layers.points.removeLayer(m); }
+        else if (!layers.points.hasLayer(m)) layers.points.addLayer(m);
+      });
+      return;
+    }
+    if (key === "congjiangHealth") {
+      [markers.congjiangOldDanger].forEach(function (m) {
+        if (isAncient) { if (!layers.points.hasLayer(m)) layers.points.addLayer(m); }
+        else if (layers.points.hasLayer(m)) layers.points.removeLayer(m);
+      });
+      [markers.congjiangNewOk].forEach(function (m) {
+        if (isAncient) { if (layers.points.hasLayer(m)) layers.points.removeLayer(m); }
+        else if (!layers.points.hasLayer(m)) layers.points.addLayer(m);
+      });
+    }
+  }
+
+  function updateFxVisibility() {
+    if (!fxMarkers) return;
+    var isAncient = routeMode === "ancient";
+    var onBig = isBigBridgeKey(activeMapStory) && currentIndex === 0;
+    var onWarm = isWarmBridgeKey(activeMapStory) && currentIndex === 1;
+    setFxLayerVisible(onBig || onWarm);
+
+    BIG_BRIDGE_KEYS.forEach(function (key) {
+      var fx = fxMarkers[key];
+      if (!fx) return;
+      var show = onBig && activeMapStory === key;
+      if (fx.heightRuler) setAnimVisible(fx.heightRuler, show);
+      if (fx.waterfall) setAnimVisible(fx.waterfall, show && !isAncient);
+      if (fx.economicGlow) setAnimVisible(fx.economicGlow, show && !isAncient);
+    });
+
+    WARM_BRIDGE_KEYS.forEach(function (key) {
+      var fx = fxMarkers[key];
+      if (!fx) return;
+      var show = onWarm && activeMapStory === key;
+      if (fx.crackMarkers) fx.crackMarkers.forEach(function (m) { setAnimVisible(m, show && isAncient); });
+      if (fx.bridgeGlow) setAnimVisible(fx.bridgeGlow, show && !isAncient);
+      if (warmDotMarkersByStory[key]) warmDotMarkersByStory[key].forEach(function (m) { setAnimVisible(m, show); });
+    });
+  }
+
+  function formatTimer(sec) {
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function stopRouteTimer() {
+    if (timerRafId) { cancelAnimationFrame(timerRafId); timerRafId = null; }
+    if (el.animTimerHud) el.animTimerHud.classList.remove("visible");
+  }
+
+  function startRouteTimer(totalSec, label) {
+    stopRouteTimer();
+    if (!el.animTimerHud) return;
+    el.animTimerLabel.textContent = label;
+    el.animTimerHud.classList.add("visible");
+    var startTs = null;
+    function frame(ts) {
+      if (!startTs) startTs = ts;
+      el.animTimerValue.textContent = formatTimer(((ts - startTs) / 1000) % (totalSec + 0.001));
+      timerRafId = requestAnimationFrame(frame);
+    }
+    timerRafId = requestAnimationFrame(frame);
+  }
+
+  function startPulseRings() {
+    if (pulseRafId) cancelAnimationFrame(pulseRafId);
+    var startTs = null;
+    function frame(ts) {
+      if (!startTs) startTs = ts;
+      var t = ((ts - startTs) % 2800) / 2800;
+      pulseCircles.forEach(function (circle, i) {
+        circle.setRadius((i === 0 ? 5000 : 10000) * (0.85 + t * 0.3));
+      });
+      pulseRafId = requestAnimationFrame(frame);
+    }
+    pulseRafId = requestAnimationFrame(frame);
+  }
+
+  function stopPulseRings() {
+    if (pulseRafId) { cancelAnimationFrame(pulseRafId); pulseRafId = null; }
+    pulseCircles.forEach(function (circle, i) { circle.setRadius(i === 0 ? 5000 : 10000); });
+  }
+
+  function stopStoryFx() {
+    stopPulseRings();
+    stopRouteTimer();
+    setFxLayerVisible(false);
+  }
+
+  function playBigBridgeFx(key) {
+    if (!BIG_BRIDGE_STORIES[key]) key = "bridge";
+    activeMapStory = key;
+    var story = BIG_BRIDGE_STORIES[key];
+    hideAllWarmBridgeLines();
+    hideAllWarmBridgeMarkers();
+    setPulseRingsAt(story.center || LOC[key] || LOC.bridge);
+    showBigBridgeLines(key, routeMode === "ancient");
+    updateFxVisibility();
+    if (markers[key]) highlightMarker(markers[key]);
+    startPulseRings();
+    var isAncient = routeMode === "ancient";
+    startRouteTimer(isAncient ? story.timerAncient : story.timerModern, isAncient ? story.timerAncientLabel : story.timerModernLabel);
+    startAllAnimations();
+  }
+
+  function playWarmBridgeFx(key) {
+    if (!WARM_BRIDGE_STORIES[key]) key = "dushan";
+    activeMapStory = key;
+    hideAllBigBridgeLines();
+    var isAncient = routeMode === "ancient";
+    showWarmBridgeLines(key, isAncient);
+    updateWarmBridgeMarkers(key, isAncient);
+    updateFxVisibility();
+    if (key === "dushan") {
+      if (isAncient) {
+        highlightMarker(markers.gaoqiaoDanger);
+        highlightMarker(markers.tiaodengDanger);
+      } else highlightMarker(markers.newBridgeOk);
+      highlightMarker(markers.dushan);
+    } else if (markers[key]) {
+      highlightMarker(markers[key]);
+      if (key === "leishanSchool" && isAncient) highlightMarker(markers.leishanOldDanger);
+      else if (key === "leishanSchool" && !isAncient) highlightMarker(markers.leishanNewOk);
+      if (key === "congjiangHealth" && isAncient) highlightMarker(markers.congjiangOldDanger);
+      else if (key === "congjiangHealth" && !isAncient) highlightMarker(markers.congjiangNewOk);
+    }
+    startAllAnimations();
+  }
+
+  function playHuajiangFx() { playBigBridgeFx("bridge"); }
+  function playDushanFx() { playWarmBridgeFx("dushan"); }
+
+  function renderStoryHtml(step) {
+    var html = '<div class="story-block">';
+    html += '<div class="step-badge">' + step.badge + '</div>';
+    html += '<h2 class="step-title">' + step.title + '</h2>';
+    if (step.cards && step.cards.length) {
+      html += '<div class="data-cards">';
+      step.cards.forEach(function (c) {
+        var val = c.value;
+        if (c.counter) val = '<span class="counter-roll" data-counter="' + c.counter + '">0</span>';
+        html += '<div class="data-card' + (c.warn ? ' warn' : '') + '"><strong>' + val + '</strong><span>' + c.label + '</span></div>';
+      });
+      html += '</div>';
+    }
+    if (step.body && step.body.length) {
+      html += '<div class="step-text">' + step.body.join("") + '</div>';
+    }
+    if (step.highlight) {
+      html += '<div class="story-data-highlight">' + step.highlight + '</div>';
+    }
+    if (step.typingLines && step.typingLines.length) {
+      html += '<div class="typing-lines"><p class="typing-line-gradient"><strong>' + step.typingLines.join(" ") + '</strong></p></div>';
+    }
+    if (step.meta) {
+      html += '<div class="step-meta' + (step.metaClass ? ' ' + step.metaClass : '') + '">' + step.meta + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function hideSubStoryControls() {
+    if (el.subStoryControls) el.subStoryControls.classList.remove("visible");
+  }
+
+  function updateStepNav(index) {
+    var pills = el.stepNav.querySelectorAll(".step-pill");
+    pills.forEach(function (pill, i) {
+      pill.classList.toggle("active", i === index);
+    });
+  }
+
+  function buildStepNav() {
+    STEPS.forEach(function (step, i) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "step-pill" + (i === 0 ? " active" : "");
+      btn.dataset.index = String(i);
+      btn.innerHTML = '<span class="num">' + (i + 1) + '</span><span class="lbl">' + step.pill + "</span>";
+      btn.addEventListener("click", function () { goToStep(i); });
+      el.stepNav.appendChild(btn);
+    });
+  }
+
+  function setRegionButtons(region) {
+    document.querySelectorAll(".region-btn[data-region]").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-region") === region && region !== "all");
+    });
+  }
+
+  function flyToRegion(region, label) {
+    if (region === "huajiang") {
+      map.flyTo(LOC.bridge, 12, { duration: 1.2 });
+      setRegionButtons("huajiang");
+    } else if (region === "dushan") {
+      flyToDushanAtScale();
+      setRegionButtons("dushan");
+    } else {
+      map.flyTo(GUIZHOU_CENTER, GUIZHOU_ZOOM, { duration: 1 });
+      setRegionButtons("all");
+    }
+    el.mapBadge.innerHTML = "<strong>当前视点</strong> · " + (label || "贵州省域总览");
+  }
+
+  function paintStoryPanel(step, index) {
+    el.storyBody.classList.remove("is-initial");
+    var subs = getSubStoriesForStep(step);
+    if (subs && subs.length) {
+      if (subStoryIndex >= subs.length) subStoryIndex = 0;
+      paintSubStoryPanel(subs[subStoryIndex], step);
+    } else {
+      hideSubStoryControls();
+      el.storyBody.innerHTML = renderStoryHtml(step);
+      requestAnimationFrame(function () {
+        var block = el.storyBody.querySelector(".story-block");
+        if (block) block.classList.add("visible");
+        bindMapJumps();
+        runCounterAnims();
+      });
+    }
+    updateStepNav(index);
+    updateRouteModeVisibility(step);
+    el.progressFill.style.width = ((index + 1) / STEPS.length * 100) + "%";
+    el.btnPrev.disabled = index === 0;
+    el.btnNext.disabled = index === STEPS.length - 1;
+    el.btnNext.innerHTML = index === STEPS.length - 1
+      ? "本章结束 <i class='fa-solid fa-flag-checkered'></i>"
+      : "下一步 <i class='fa-solid fa-chevron-right'></i>";
+  }
+
+  function regionForStoryKey(key) {
+    return key === "bridge" ? "huajiang" : key;
+  }
+  function getSubStoriesForStep(step) {
+    if (!step) return null;
+    return SUB_STORIES[step.id] || null;
+  }
+  function findSubStoryIndex(stepId, key) {
+    var list = SUB_STORIES[stepId];
+    if (!list) return 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].key === key) return i;
+    }
+    return 0;
+  }
+  function paintSubStoryPanel(sub, step) {
+    el.storyBody.innerHTML = renderStoryHtml(sub);
+    requestAnimationFrame(function () {
+      var block = el.storyBody.querySelector(".story-block");
+      if (block) block.classList.add("visible");
+      bindMapJumps();
+      runCounterAnims();
+    });
+    updateRouteModeVisibility(step);
+    var subs = getSubStoriesForStep(step);
+    if (subs) updateSubStoryControls(subs, subStoryIndex);
+  }
+  function updateSubStoryControls(subs, index) {
+    if (!el.subStoryControls || !subs) return;
+    el.subStoryControls.classList.add("visible");
+    el.subStoryControls.classList.toggle("warm-theme", STEPS[currentIndex] && STEPS[currentIndex].id === "story2");
+    el.btnSubStoryPrev.disabled = index <= 0;
+    el.btnSubStoryNext.disabled = index >= subs.length - 1;
+    if (el.subStoryIndicator) el.subStoryIndicator.textContent = (index + 1) + " / " + subs.length;
+  }
+  function goToSubStory(newIndex) {
+    var step = STEPS[currentIndex];
+    var subs = getSubStoriesForStep(step);
+    if (!subs) return;
+    newIndex = Math.max(0, Math.min(subs.length - 1, newIndex));
+    if (newIndex === subStoryIndex) return;
+    subStoryIndex = newIndex;
+    paintSubStoryPanel(subs[subStoryIndex], step);
+    setRegionButtons(regionForStoryKey(subs[subStoryIndex].key));
+    flyToTarget(subs[subStoryIndex].key, true);
+  }
+  function goToRegionStory(region) {
+    if (region === "all") {
+      goToStep(2);
+      return;
+    }
+    var cfg = REGION_STORY_MAP[region];
+    if (!cfg) return;
+    var step = STEPS[cfg.step];
+    var subs = SUB_STORIES[step.id];
+    var storyKey = subs[cfg.sub].key;
+    if (cfg.step === currentIndex && cfg.sub === subStoryIndex) {
+      setRegionButtons(region);
+      flyToTarget(storyKey, true);
+      return;
+    }
+    currentIndex = cfg.step;
+    subStoryIndex = cfg.sub;
+    paintStoryPanel(step, cfg.step);
+    updateRouteModeVisibility(step);
+    setRegionButtons(region);
+    setTimeout(function () {
+      flyToTarget(storyKey, true);
+    }, 1250);
+  }
+  function goToStep(index) {
+    index = Math.max(0, Math.min(STEPS.length - 1, index));
+    var step = STEPS[index];
+    var changed = index !== currentIndex;
+    currentIndex = index;
+    if (changed) subStoryIndex = 0;
+    if (changed) paintStoryPanel(step, index);
+    else updateRouteModeVisibility(step);
+    var subs = getSubStoriesForStep(step);
+    if (subs && subs[subStoryIndex]) {
+      setTimeout(function () {
+        flyToTarget(subs[subStoryIndex].key, true);
+      }, 1250);
+    } else {
+      flyToRegion(step.region, step.mapLabel);
+      setTimeout(function () {
+        stopStoryFx();
+      }, 1250);
+    }
+  }
+  function getCityName(props) {
+    if (!props) return "贵州市县";
+    var keys = ["NAME", "Name", "name", "名称", "市名", "XZQMC", "qxmc", "CITY_NAME", "市级名称", "SHI"];
+    for (var i = 0; i < keys.length; i++) {
+      if (props[keys[i]]) return props[keys[i]];
+    }
+    return "贵州市县";
+  }
+
+  function createBoundaryStyle(mainMap) {
+    if (mainMap) {
+      return { color: "#a03720", weight: 2.4, opacity: 1, fillColor: "#b85c38", fillOpacity: 0.22 };
+    }
+    return { color: "#3d5a78", weight: 1.2, opacity: 1, fillColor: "#5c6d7e", fillOpacity: 0.14 };
+  }
+
+  function bindBoundaryPopup(feature, layer) {
+    layer.bindPopup("<div class='popup-title'>" + getCityName(feature.properties) + "</div>贵州<strong>市级行政区划</strong>（GeoScene 市界）<br>桥梁建设分布与<strong>区域发展</strong>紧密相关 · 点击地图符号了解更多故事");
+  }
+
+  function applyBasemap(key) {
+    currentBasemapKey = key;
+    Object.keys(baseLayers).forEach(function (k) {
+      if (map.hasLayer(baseLayers[k])) map.removeLayer(baseLayers[k]);
+    });
+    if (key === "terrain-relief") baseLayers.terrain.addTo(map);
+    else baseLayers.streets.addTo(map);
+    if (overviewMap) {
+      Object.keys(overviewBaseLayers).forEach(function (k) {
+        if (overviewMap.hasLayer(overviewBaseLayers[k])) overviewMap.removeLayer(overviewBaseLayers[k]);
+      });
+      if (key === "terrain-relief") overviewBaseLayers.terrain.addTo(overviewMap);
+      else overviewBaseLayers.streets.addTo(overviewMap);
+    }
+    document.getElementById("basemapSelect").value = key;
+    if (boundaryLayer && boundaryLayer.bringToBack) boundaryLayer.bringToBack();
+  }
+
+  function loadBoundaryLayers() {
+    if (typeof L.esri === "undefined" || !L.esri.featureLayer) return;
+    boundaryLayer = L.esri.featureLayer({
+      url: BOUNDARY_URL,
+      style: function () { return createBoundaryStyle(true); },
+      onEachFeature: bindBoundaryPopup
+    });
+    boundaryLayer.addTo(map);
+    if (boundaryLayer.bringToBack) boundaryLayer.bringToBack();
+    if (overviewMap) {
+      overviewBoundaryLayer = L.esri.featureLayer({
+        url: BOUNDARY_URL,
+        style: function () { return createBoundaryStyle(false); },
+        interactive: false
+      });
+      overviewBoundaryLayer.addTo(overviewMap);
+    }
+  }
+
+  function initCorridorNetwork() {
+    var corridorPopup =
+      "<div class='popup-title' style='color:#f39c12'>贵州经济走廊</div>" +
+      "以<strong>贵阳</strong>为中心，网状辐射全省各片区<br>桥接桥，串起<strong>发展与希望</strong>" +
+      "<br><span style='font-size:0.72rem;color:#5c6570'>网络与坐标为示意展示</span>";
+
+    CORRIDOR_EDGES.forEach(function (edge) {
+      var a = CORRIDOR_NODE_LL[edge[0]], b = CORRIDOR_NODE_LL[edge[1]];
+      if (!a || !b) return;
+      L.polyline([a, b], {
+        color: "#f39c12",
+        weight: 4,
+        opacity: 0.78,
+        lineCap: "round",
+        lineJoin: "round"
+      }).bindPopup(corridorPopup).addTo(corridorLinesGroup);
+    });
+  }
+
+  function initMap() {
+    map = L.map("map", { zoomControl: false, maxZoom: 22 }).setView(GUIZHOU_CENTER, GUIZHOU_ZOOM);
+
+    baseLayers.streets = L.tileLayer(AGOL + "World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Esri", maxZoom: 22, maxNativeZoom: 19
+    });
+    baseLayers.topo = L.tileLayer(AGOL + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Esri", maxZoom: 22, maxNativeZoom: 19
+    });
+    baseLayers.hillshade = L.tileLayer(AGOL + "Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", {
+      attribution: "Esri", maxZoom: 22, maxNativeZoom: 19, opacity: 0.58
+    });
+    baseLayers.terrain = L.layerGroup([baseLayers.topo, baseLayers.hillshade]);
+    applyBasemap(currentBasemapKey);
+
+    layers = {
+      radiation: L.layerGroup(), routes: L.layerGroup(),
+      corridor: L.layerGroup(), points: L.layerGroup(), anim: L.layerGroup(), fx: L.layerGroup()
+    };
+    Object.keys(layers).forEach(function (k) { layers[k].addTo(map); });
+
+    pulseCircles = [
+      L.circle(LOC.bridge, { radius: 5000, color: COLORS.orange, weight: 1, fillColor: COLORS.orange, fillOpacity: 0.08, dashArray: "4 6", className: "pulse-ring" })
+        .bindPopup("<div class='popup-title height'>桥旅融合 · 5km 辐射圈</div>花江峡谷大桥通车后，<strong>5公里</strong>范围内民宿、摄影点、特产摊点快速集聚。<br>科力寨、云渡服务区形成<strong>桥景消费圈</strong>（示意）").addTo(layers.radiation),
+      L.circle(LOC.bridge, { radius: 10000, color: COLORS.orange, weight: 1, fillColor: COLORS.orange, fillOpacity: 0.05, dashArray: "8 8", className: "pulse-ring" })
+        .bindPopup("<div class='popup-title height'>桥旅融合 · 10km 辐射圈</div>以大桥为核，<strong>10公里</strong>辐射带串联小花江、五里村等村落。<br>日车流超<strong>1万辆</strong> · 桥旅融合<strong>从点成面</strong>（示意）").addTo(layers.radiation)
+    ];
+
+    function makeRouteLine(latlngs, isOld) {
+      return L.polyline(latlngs, {
+        color: isOld ? COLORS.red : COLORS.green,
+        weight: isOld ? 4 : 5,
+        opacity: isOld ? 0.85 : 0.9,
+        dashArray: isOld ? "14 10" : null,
+        className: isOld ? "route-dash-flow" : ""
+      });
+    }
+
+    function makeWarmRouteLine(latlngs, isOld) {
+      return L.polyline(latlngs, {
+        color: isOld ? COLORS.gray : COLORS.greenBright,
+        weight: isOld ? 4 : 5,
+        opacity: isOld ? 0.8 : 0.9,
+        dashArray: isOld ? "10 8" : null,
+        className: isOld ? "route-dash-flow" : ""
+      });
+    }
+
+    var routeBeforeLabels = { bridge: "盘山路（通车前）", beipan: "跨省绕行（通车前）", yachi: "峡谷绕路（通车前）", baling: "景区绕路（通车前）" };
+    var routeAfterLabels = { bridge: "高速通道（通车后）", beipan: "大桥通道（通车后）", yachi: "峡谷高速（通车后）", baling: "桥旅直达（通车后）" };
+    var routeBeforeBody = {
+      bridge: "两岸村民绕行盘山需<strong>2小时+</strong><br>通行不便 · 物流成本高 · 发展受阻",
+      beipan: "黔滇往来需<strong>5小时</strong>绕行<br>隔江相望 · 物资流通慢",
+      yachi: "贵阳至黔西需<strong>4小时</strong><br>鲜果难以及时外运",
+      baling: "通往黄果树需长时间绕路<br>旅游潜力难以释放"
+    };
+    var routeAfterBody = {
+      bridge: "驾车过桥约<strong>5—10分钟</strong><br>便捷通达 · 桥旅融合 · 经济提速",
+      beipan: "跨省车程缩短至<strong>1小时</strong><br>黔滇互联 · 市场互通",
+      yachi: "车程缩短至<strong>50分钟</strong><br>物流动脉 · 果农增收",
+      baling: "桥旅一体直达景区<br>游客倍增 · 消费集聚"
+    };
+    var warmPathBody = {
+      dushan: "独山三里村日常路：上学 · 赶集 · 就医 · 对岸贸易<br><strong>危桥改造</strong>后，村民脚步更稳、心里更暖",
+      leishanSchool: "雷山苗寨孩子的求学路<br>从<strong>蹚水过河</strong>到<strong>干爽安全</strong>的上学通道",
+      congjiangHealth: "从江侗寨通往卫生院的生命线<br><strong>救护车</strong>终于能开进山村"
+    };
+
+    BIG_BRIDGE_KEYS.forEach(function (key) {
+      var story = BIG_BRIDGE_STORIES[key];
+      var oldLine = makeRouteLine(story.oldRoad, true);
+      var newLine = makeRouteLine(story.newRoad, false);
+      oldLine.bindPopup("<div class='popup-title'>" + routeBeforeLabels[key] + "</div>" + routeBeforeBody[key]);
+      newLine.bindPopup("<div class='popup-title'>" + routeAfterLabels[key] + "</div>" + routeAfterBody[key]);
+      bridgeRouteLines[key] = { oldLine: oldLine, newLine: newLine };
+    });
+    oldRoadLine = bridgeRouteLines.bridge.oldLine;
+    newRoadLine = bridgeRouteLines.bridge.newLine;
+
+    WARM_BRIDGE_KEYS.forEach(function (key) {
+      var story = WARM_BRIDGE_STORIES[key];
+      var oldLine = makeWarmRouteLine(story.path, true);
+      var newLine = makeWarmRouteLine(story.path, false);
+      var warmLine = L.polyline(story.path, {
+        color: "#f9e79f", weight: 5, opacity: 0.82, dashArray: "14 10", className: "route-dash-flow"
+      });
+      warmLine.bindPopup("<div class='popup-title warm'>温情通道</div>" + warmPathBody[key]);
+      warmBridgeLines[key] = { oldLine: oldLine, newLine: newLine, warmPathLine: warmLine };
+    });
+    villagerOldLine = warmBridgeLines.dushan.oldLine;
+    villagerNewLine = warmBridgeLines.dushan.newLine;
+    warmPathLine = warmBridgeLines.dushan.warmPathLine;
+    corridorLinesGroup = L.layerGroup().addTo(layers.corridor);
+
+    function pathSymbolMarker(latlng, emoji, popupHtml, key) {
+      markers[key] = bindRichPopup(L.marker(latlng, { icon: makeIcon(emoji, 4) }), key, popupHtml)
+        .addTo(layers.points);
+    }
+
+    function makeIcon(emoji, size) {
+      size = size || 4;
+      return L.divIcon({
+        className: "custom-marker",
+        html: "<div class='icon-pin' style='font-size:" + (size * 0.38) + "rem'>" + emoji + "</div>",
+        iconSize: [size, size], iconAnchor: [size / 2, size / 2]
+      });
+    }
+
+    initCorridorNetwork();
+
+    markers = {};
+    markers.bridge = bindRichPopup(L.marker(LOC.bridge, { icon: makeIcon("🌉", 4) }), "bridge",
+      "<div class='popup-title height'>花江峡谷大桥</div>桥面距水面 <strong>626m</strong> · 主跨 <strong>1420m</strong><br>2025年9月28日通车 · <strong>横竖世界第一</strong><br>西部陆海新通道关键节点 · 桥旅融合标杆<br><span style='color:" + COLORS.accent + "'>云渡服务区 · 全球最高人工瀑布（示意）</span>"
+    ).addTo(layers.points);
+    markers.kelizhai = bindRichPopup(L.marker(LOC.kelizhai, { icon: makeIcon("🏘️") }), "kelizhai",
+      "<div class='popup-title height'>科力寨（五里村）</div>25户128人<strong>仡佬族</strong>村寨 · 大桥最佳观景视角之一<br>2025年“十一”日车流超 <strong>1万辆</strong><br>民宿、摄影、特产经济<strong>因桥而兴</strong>"
+    ).addTo(layers.points);
+    markers.xiaohuajiang = bindRichPopup(L.marker(LOC.xiaohuajiang, { icon: makeIcon("🛖") }), "xiaohuajiang",
+      "<div class='popup-title height'>小花江村</div><strong>布依族</strong>聚居村落 · 蜡染与特产闻名<br>大桥通车后民宿农家乐<strong>常年满房</strong><br>年轻人返乡创业 · 桥景带火乡土手艺"
+    ).addTo(layers.points);
+    markers.yunfu = L.marker(LOC.yunfu, { icon: makeIcon("☁️") }).bindPopup(
+      "<div class='popup-title height'>云渡服务区</div>桥梁博物馆 · 悬崖酒店 · 竞速跑道<br>200m观光电梯 · 625m高空水幕<br><strong>桥旅融合</strong>核心体验区（示意）"
+    ).addTo(layers.points);
+    markers.guiyang = L.marker(LOC.guiyang, { icon: makeIcon("🔵", 4) }).bindPopup(
+      "<div class='popup-title' style='color:" + COLORS.blue + "'>贵阳枢纽</div>西南高铁/高速网核心 · 西部陆海新通道枢纽<br>经济走廊<strong>放射中心</strong> · 连接全省超级桥梁网络（示意）"
+    ).addTo(layers.points);
+    markers.beipan = bindRichPopup(L.marker(LOC.beipan, { icon: makeIcon("⭐", 4) }), "beipan",
+      "<div class='popup-title height'>🏗️ 北盘江大桥</div>📏 高度：<strong>565米</strong>（曾是世界第一）<br>📅 2016年12月29日通车 · 都格镇<br>🌉 连接贵州与云南，车程从<strong>5小时缩短到1小时</strong><br>📖 都格镇<strong>黔滇门户</strong> · 彝族火把节、苗族芦笙物资经此互通<br>两岸隔江相望变<strong>步行10分钟走亲戚</strong> · 跨省贸易<strong>翻两番</strong>（示意）"
+    ).addTo(layers.points);
+    markers.yachi = bindRichPopup(L.marker(LOC.yachi, { icon: makeIcon("⭐", 4) }), "yachi",
+      "<div class='popup-title height'>🏗️ 鸭池河大桥</div>📏 高度：<strong>434米</strong> · 主跨800米<br>📅 2016年7月16日通车<br>🌉 贵阳至黔西从<strong>4小时缩短到50分钟</strong><br>🍒 黔西樱桃、李子<strong>当天进城</strong> · 一斤多卖<strong>5块钱</strong><br>钢桁梁加劲梁结构征服峡谷风雾天险 · <strong>物流动脉</strong>"
+    ).addTo(layers.points);
+    markers.baling = bindRichPopup(L.marker(LOC.baling, { icon: makeIcon("⭐", 4) }), "baling",
+      "<div class='popup-title height'>🏗️ 坝陵河大桥</div>📏 高度：<strong>370米</strong> · 主跨1088米<br>📅 2009年12月23日 · 贵州第一座超级大桥<br>🪂 世界最高商业蹦极 · 毗邻<strong>黄果树</strong><br>📖 贵州<strong>桥旅融合</strong>开创者 · 蹦极+黄果树联动<br>餐饮、民宿、文创<strong>全面升级</strong> · 一座桥成一个景区"
+    ).addTo(layers.points);
+    markers.leishanSchool = bindRichPopup(L.marker(LOC.leishanSchool, { icon: makeIcon("❤️", 4) }), "leishanSchool",
+      "<div class='popup-title warm'>❤️ 雷山县·上学桥</div>📏 人行便桥 · 宽1.5米水泥桥（2023）<br>🎒 木栈道 → 有护栏的安全通道<br>📖 苗族「飞歌」村寨 · 2023年宽1.5m水泥便桥<br><strong>12个孩子</strong>穿着干爽鞋蹦蹦跳跳去上学 · 托起求学梦"
+    ).addTo(layers.points);
+    markers.congjiangHealth = bindRichPopup(L.marker(LOC.congjiangHealth, { icon: makeIcon("❤️", 4) }), "congjiangHealth",
+      "<div class='popup-title warm'>❤️ 从江县·健康桥</div>📏 类型：车行小桥<br>🛠️ 限重1吨危桥 → 可通救护车新桥<br>📖 侗族大歌之乡 · 2024年新桥可通<strong>救护车</strong><br>通车全村放鞭炮 —— <strong>这不仅是桥，是救命的路</strong>"
+    ).addTo(layers.points);
+    markers.zunyi = L.marker(LOC.zunyi, { icon: makeIcon("⭐", 4) }).bindPopup(
+      "<div class='popup-title height'>遵义片区</div>红色圣地 · 酱香产业重镇<br>经济走廊<strong>北向枢纽</strong> · 连接遵义—贵阳—铜仁通道（示意）"
+    ).addTo(layers.points);
+    markers.tongren = L.marker(LOC.tongren, { icon: makeIcon("⭐", 4) }).bindPopup(
+      "<div class='popup-title height'>铜仁片区</div>梵净山世界自然遗产门户 · 生态旅游重镇<br>黔东北与湘西联络<strong>关键节点</strong>（示意）"
+    ).addTo(layers.points);
+    markers.bijie = L.marker(LOC.bijie, { icon: makeIcon("⭐", 4) }).bindPopup(
+      "<div class='popup-title height'>毕节片区</div>乌蒙山片区能源与特色农业节点<br>连接毕节—六盘水—云南方向（示意）"
+    ).addTo(layers.points);
+    markers.kaili = L.marker(LOC.kaili, { icon: makeIcon("❤️", 4) }).bindPopup(
+      "<div class='popup-title warm'>凯里片区</div>黔东南州府 · 苗侗文化门户<br>农产品与非遗工艺<strong>集散中心</strong>（示意）"
+    ).addTo(layers.points);
+    markers.dushan = bindRichPopup(L.marker(LOC.dushan, { icon: makeIcon("❤️", 4) }), "dushan",
+      "<div class='popup-title warm'>独山县·麻万镇</div>危桥改造区域 · 8座桥 · 总投资<strong>1344万元</strong><br>麻万镇三里村危桥改造区 · 8座桥总投资<strong>1344万元</strong><br>高桥、跳等桥联通都匀墨冲镇 · 村民<strong>上学赶集就医</strong>必经之路"
+    ).addTo(layers.points);
+    markers.gaoqiaoDanger = bindRichPopup(L.marker(LOC.gaoqiao, { icon: makeIcon("⚠️") }), "gaoqiao",
+      "<div class='popup-title warm'>高桥（改造前）</div>桥面<strong>裂缝明显</strong> · 承载不足 · 洪水季风险高<br>村民：“一到下雨天，不敢让娃娃去上学。”<br>2025年纳入<strong>8座危桥</strong>改造计划"
+    ).addTo(layers.points);
+    markers.tiaodengDanger = bindRichPopup(L.marker(LOC.tiaodeng, { icon: makeIcon("⚠️") }), "tiaodeng",
+      "<div class='popup-title warm'>跳等桥（改造前）</div>与<strong>高桥</strong>同为三里村日常通道<br>桥面老化 · 雨季通行困难 · 2025年同步改造"
+    ).addTo(layers.points);
+    markers.newBridgeOk = L.marker(LOC.newBridge, { icon: makeIcon("✅", 4) }).bindPopup(
+      "<div class='popup-title warm'>新桥（改造后）</div>总投资 <strong>1344万元</strong>（8座）<br>8座危桥<strong>原址拆除重建</strong><br>公路-I/Ⅱ级 · 洪水频率<strong>1/25</strong><br>货车可进村 · 孩子安心上学"
+    );
+    markers.gaoqiaoOk = bindRichPopup(L.marker(LOC.gaoqiao, { icon: makeIcon("✅") }), "gaoqiao",
+      "<div class='popup-title warm'>高桥（已改造）</div>高桥原址<strong>拆除重建</strong> · 公路-I级标准<br>承载能力满足乡村货运与客运需求"
+    );
+    markers.tiaodengOk = bindRichPopup(L.marker(LOC.tiaodeng, { icon: makeIcon("✅") }), "tiaodeng",
+      "<div class='popup-title warm'>跳等桥（已改造）</div>跳等桥<strong>公路-Ⅱ级</strong>重建 · 连接对岸集市方向<br>赶集、就医往来更安全便捷"
+    );
+    markers.leishanOldDanger = bindRichPopup(L.marker(LOC.leishanOldFord, { icon: makeIcon("⚠️", 4) }), "leishanOldFord",
+      "<div class='popup-title warm'>旧渡点（改造前）</div>改造前<strong>木栈道与原木</strong> · 雨季常被冲毁<br>苗族孩子须<strong>脱鞋蹚水</strong>去上学 · 2023年前"
+    );
+    markers.leishanNewOk = bindRichPopup(L.marker(LOC.leishanSchool, { icon: makeIcon("✅", 4) }), "leishanSchool",
+      "<div class='popup-title warm'>上学桥（改造后）</div>2023年通车 · 宽<strong>1.5m</strong>水泥桥 · 全程护栏<br>托起<strong>12个孩子</strong>的求学梦 · 飞歌伴读书声"
+    );
+    markers.congjiangOldDanger = L.marker(LOC.congjiangOldFord, { icon: makeIcon("⚠️", 4) }).bindPopup(
+      "<div class='popup-title warm'>旧桥（改造前）</div>旧桥<strong>限重1吨</strong> · 救护车无法通过<br>病人需人抬过桥 · 2024年冬曾发生<strong>紧急送医延误</strong>（示意）"
+    );
+    markers.congjiangNewOk = bindRichPopup(L.marker(LOC.congjiangHealth, { icon: makeIcon("✅", 4) }), "congjiangHealth",
+      "<div class='popup-title warm'>健康桥（改造后）</div>2024年新桥 · 可通<strong>救护车与农用货车</strong><br>侗寨救命通道 · 通车那天全村<strong>放鞭炮</strong>"
+    );
+
+    pathSymbolMarker(
+      LOC.beipanGuizhou,
+      "🏘️",
+      "<div class='popup-title height'>都格镇·贵州侧</div>北盘江大桥<strong>贵州端</strong><br>北盘江大桥<strong>贵州端</strong> · 都格镇集市枢纽<br>跨省煤炭、果蔬、非遗物资<strong>快进快出</strong>",
+      "beipanGuizhou"
+    );
+    pathSymbolMarker(
+      LOC.beipanYunnan,
+      "🤝",
+      "<div class='popup-title height'>都格镇·云南侧</div>大桥云南端方向 · 步行<strong>10分钟</strong>到对岸走亲戚<br>黔滇互联的<strong>温情节点</strong> · 节庆物资互通",
+      "beipanYunnan"
+    );
+    pathSymbolMarker(
+      LOC.yachiGuiyang,
+      "🍒",
+      "<div class='popup-title height'>贵阳方向果园</div>乌蒙山<strong>果园带</strong> · 樱桃李子经大桥当天抵贵阳<br>鲜果溢价约<strong>5元/斤</strong> · 物流变致富路",
+      "yachiGuiyang"
+    );
+    pathSymbolMarker(
+      LOC.yachiQianxi,
+      "🏪",
+      "<div class='popup-title height'>黔西方向</div>黔西方向<strong>农特产品集散</strong> · 连接贵阳与乌蒙山区<br>峡谷飞虹下的<strong>物流节点</strong>",
+      "yachiQianxi"
+    );
+    pathSymbolMarker(
+      LOC.balingScenic,
+      "🪂",
+      "<div class='popup-title height'>桥旅体验区</div>世界最高商业蹦极<strong>370m</strong> · 桥旅体验起点<br>贵州<strong>桥旅融合</strong>开创地 · 极限运动引流",
+      "balingScenic"
+    );
+    pathSymbolMarker(
+      LOC.balingHuangguoshu,
+      "🌊",
+      "<div class='popup-title height'>黄果树景区</div>毗邻<strong>黄果树瀑布</strong> · 坝陵河大桥观景平台<br>桥旅联动后游客流量<strong>倍增</strong>（示意）",
+      "balingHuangguoshu"
+    );
+
+    pathSymbolMarker(
+      LOC.village,
+      "🎒",
+      "<div class='popup-title warm'>上学 · 赶集 · 就医</div>三里村居民的日常通行为<strong>孩子上学、赶集买卖、老人就医</strong>都要走高桥与跳等桥 · 改造前<strong>雨天不敢过桥</strong><br>新桥贯通后，上学赶集就医<strong>不再提心吊胆</strong>",
+      "villageLife"
+    );
+
+    pathSymbolMarker(
+      LOC.leishanVillage,
+      "🎒",
+      "<div class='popup-title warm'>苗寨上学路</div>雷山苗族村寨，孩子们曾<strong>脱鞋蹚水</strong>去上学；雷山<strong>苗族</strong>村寨 · 改造前孩子蹚水上学<br>新桥修好后，飞歌声里多了<strong>朗朗读书声</strong>",
+      "leishanVillageLife"
+    );
+    pathSymbolMarker(
+      LOC.leishanSchoolGate,
+      "🏫",
+      "<div class='popup-title warm'>雷山小学</div>村小方向 · 2023年水泥桥贯通<br><strong>12个孩子</strong>的安全求学通道 · 有护栏全天候通行",
+      "leishanGate"
+    );
+    pathSymbolMarker(
+      LOC.congjiangVillage,
+      "🏘️",
+      "<div class='popup-title warm'>侗寨人家</div>从江侗族大歌之乡，从江<strong>侗族</strong>大歌之乡 · 旧桥限重1吨<br>救护车进不了村 · 急症需人抬过桥",
+      "congjiangVillageLife"
+    );
+    pathSymbolMarker(
+      LOC.congjiangClinic,
+      "🏥",
+      "<div class='popup-title warm'>乡卫生院</div>健康桥通车后，乡卫生院方向 · 健康桥通车后<br>急救车可直接开到村口 —— <strong>救命的路</strong>终于畅通",
+      "congjiangClinicPt"
+    );
+    pathSymbolMarker(
+      [25.82, 107.56],
+      "🏪",
+      "<div class='popup-title warm'>对岸集市</div>联通都匀墨冲镇方向的<strong>对岸集市</strong>，是周边村寨重要的贸易集散地。<br>联通都匀墨冲镇 · 周边村寨<strong>重要贸易集散地</strong><br>新桥通车后货物直拉村口 · 赶集往来<strong>更有温度</strong>",
+      "oppositeMarket"
+    );
+
+    animMarkers = {};
+    function makeAnimIcon(html) {
+      return L.marker([0, 0], {
+        icon: L.divIcon({ className: "custom-marker", html: html, iconSize: [4, 4], iconAnchor: [2, 2] }),
+        zIndexOffset: 1000
+      });
+    }
+    animMarkers.slowDot = makeAnimIcon("<div class='icon-glow' style='color:" + COLORS.red + ";font-size:0.75rem'>●</div>").addTo(layers.anim);
+    animMarkers.car = makeAnimIcon("<div class='icon-car'>🚗</div>").addTo(layers.anim);
+    animMarkers.personHesitant = makeAnimIcon("<div class='icon-person'>🚶</div>").addTo(layers.anim);
+    animMarkers.personSmooth = makeAnimIcon("<div class='icon-person'>🚶</div>").addTo(layers.anim);
+    animMarkers.corridorGlow = makeAnimIcon("<div class='icon-glow' style='color:#f1c40f'>✦</div>").addTo(layers.anim);
+
+    function makeHeightRuler(pos, label) {
+      return L.marker(pos, {
+        icon: L.divIcon({
+          className: "custom-marker",
+          html: "<div class='height-ruler-icon'><div class='ruler-track'><div class='ruler-fill'></div></div><span class='ruler-label'>" + label + "</span></div>",
+          iconSize: [4, 4], iconAnchor: [2, 0]
+        })
+      }).addTo(layers.fx);
+    }
+
+    function makeEconomicFx(pos, emoji) {
+      return L.marker(pos, {
+        icon: L.divIcon({
+          className: "custom-marker",
+          html: "<div class='icon-glow' style='font-size:0.85rem'>" + emoji + "</div>",
+          iconSize: [4, 4], iconAnchor: [2, 2]
+        })
+      }).addTo(layers.fx);
+    }
+
+    function makeCrackFx(pos) {
+      return L.marker(pos, {
+        icon: L.divIcon({ className: "custom-marker", html: "<div class='crack-fx'>⚠️</div>", iconSize: [4, 4], iconAnchor: [2, 2] })
+      }).addTo(layers.fx);
+    }
+
+    function makeBridgeGlowFx(pos) {
+      return L.marker(pos, {
+        icon: L.divIcon({ className: "custom-marker", html: "<div class='bridge-glow-fx'></div>", iconSize: [4, 4], iconAnchor: [2, 2] })
+      }).addTo(layers.fx);
+    }
+
+    function makeWarmDots(path) {
+      return path.slice(0, Math.min(3, path.length)).map(function (ll) {
+        return L.marker(ll, {
+          icon: L.divIcon({ className: "custom-marker", html: "<div class='warm-dot-fx'></div>", iconSize: [4, 4], iconAnchor: [2, 2] })
+        }).addTo(layers.fx);
+      });
+    }
+
+    fxMarkers = {};
+    fxMarkers.bridge = {
+      heightRuler: makeHeightRuler(BIG_BRIDGE_STORIES.bridge.heightRulerPos, BIG_BRIDGE_STORIES.bridge.heightLabel),
+      waterfall: L.marker(BIG_BRIDGE_STORIES.bridge.waterfallPos, {
+        icon: L.divIcon({
+          className: "custom-marker",
+          html: "<div class='waterfall-fx'><span></span><span></span><span></span></div>",
+          iconSize: [4, 4], iconAnchor: [2, 0]
+        })
+      }).addTo(layers.fx)
+    };
+    fxMarkers.beipan = {
+      heightRuler: makeHeightRuler(BIG_BRIDGE_STORIES.beipan.heightRulerPos, BIG_BRIDGE_STORIES.beipan.heightLabel),
+      economicGlow: makeEconomicFx(LOC.beipanGuizhou, BIG_BRIDGE_STORIES.beipan.economicFx)
+    };
+    fxMarkers.yachi = {
+      heightRuler: makeHeightRuler(BIG_BRIDGE_STORIES.yachi.heightRulerPos, BIG_BRIDGE_STORIES.yachi.heightLabel),
+      economicGlow: makeEconomicFx(LOC.yachiGuiyang, BIG_BRIDGE_STORIES.yachi.economicFx)
+    };
+    fxMarkers.baling = {
+      heightRuler: makeHeightRuler(BIG_BRIDGE_STORIES.baling.heightRulerPos, BIG_BRIDGE_STORIES.baling.heightLabel),
+      economicGlow: makeEconomicFx(LOC.balingHuangguoshu, BIG_BRIDGE_STORIES.baling.economicFx)
+    };
+    fxMarkers.dushan = {
+      crackMarkers: [makeCrackFx(LOC.gaoqiao), makeCrackFx(LOC.tiaodeng)],
+      bridgeGlow: makeBridgeGlowFx(LOC.newBridge)
+    };
+    fxMarkers.leishanSchool = {
+      crackMarkers: [makeCrackFx(LOC.leishanOldFord)],
+      bridgeGlow: makeBridgeGlowFx(LOC.leishanSchool)
+    };
+    fxMarkers.congjiangHealth = {
+      crackMarkers: [makeCrackFx(LOC.congjiangOldFord)],
+      bridgeGlow: makeBridgeGlowFx(LOC.congjiangHealth)
+    };
+    warmDotMarkersByStory = {
+      dushan: makeWarmDots(villagerPath),
+      leishanSchool: makeWarmDots(leishanPath),
+      congjiangHealth: makeWarmDots(congjiangPath)
+    };
+    warmDotMarkers = warmDotMarkersByStory.dushan;
+    if (el.fxCanvas) {
+      fxCtx = el.fxCanvas.getContext("2d");
+      resizeFxCanvas();
+    }
+
+    map.on("mousemove", function (e) {
+      el.coordLon.textContent = e.latlng.lng.toFixed(5);
+      el.coordLat.textContent = e.latlng.lat.toFixed(5);
+    });
+    map.on("moveend zoomend", updateOverviewRect);
+    map.on("zoomend moveend", updateScaleText);
+
+    initOverviewMap();
+    loadBoundaryLayers();
+
+  }
+
+  function initOverviewMap() {
+    overviewMap = L.map("overviewMap", {
+      zoomControl: false, attributionControl: false,
+      dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false
+    });
+    overviewBaseLayers.streets = L.tileLayer(AGOL + "World_Street_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 10 });
+    overviewBaseLayers.topo = L.tileLayer(AGOL + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { maxZoom: 10 });
+    overviewBaseLayers.hillshade = L.tileLayer(AGOL + "Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", { maxZoom: 10, opacity: 0.58 });
+    overviewBaseLayers.terrain = L.layerGroup([overviewBaseLayers.topo, overviewBaseLayers.hillshade]);
+    overviewBaseLayers.streets.addTo(overviewMap);
+    overviewMap.fitBounds(GUIZHOU_BOUNDS);
+    overviewRect = L.rectangle(map.getBounds(), {
+      color: "#b85c38", weight: 2, fillOpacity: 0.08, interactive: false
+    }).addTo(overviewMap);
+    updateOverviewRect();
+    updateScaleText();
+  }
+
+  function updateOverviewRect() {
+    if (!overviewRect) return;
+    overviewRect.setBounds(map.getBounds());
+  }
+
+  function updateScaleText() {
+    if (!map || !el.scaleLabel) return;
+    var midY = map.getSize().y / 2;
+    var x1 = map.containerPointToLatLng([0, midY]);
+    var x2 = map.containerPointToLatLng([80, midY]);
+    var meters = map.distance(x1, x2);
+    var label;
+    if (meters >= 10000) label = Math.round(meters / 1000) + "公里";
+    else if (meters >= 1000) label = (meters / 1000).toFixed(1).replace(/\.0$/, "") + "公里";
+    else label = Math.round(meters) + "米";
+    el.scaleLabel.textContent = label;
+  }
+
+  function resizeFxCanvas() {
+    if (!el.fxCanvas) return;
+    var rect = el.fxCanvas.parentElement.getBoundingClientRect();
+    el.fxCanvas.width = rect.width;
+    el.fxCanvas.height = rect.height;
+    if (!fxCtx) fxCtx = el.fxCanvas.getContext("2d");
+    if (fxCtx) fxCtx.clearRect(0, 0, el.fxCanvas.width, el.fxCanvas.height);
+  }
+
+  function drawWarmPathCanvas() {
+    /* 温情路径已改为 Leaflet 折线 warmPathLine，随地图平移缩放 */
+  }
+
+  function latLngAtProgress(latlngs, t) {
+    if (t <= 0) return latlngs[0];
+    if (t >= 1) return latlngs[latlngs.length - 1];
+    var segs = [], total = 0;
+    for (var i = 0; i < latlngs.length - 1; i++) {
+      var a = L.latLng(latlngs[i]), b = L.latLng(latlngs[i + 1]), d = a.distanceTo(b);
+      segs.push({ a: a, b: b, d: d, start: total });
+      total += d;
+    }
+    var dist = t * total;
+    for (var j = 0; j < segs.length; j++) {
+      if (dist <= segs[j].start + segs[j].d) {
+        var local = (dist - segs[j].start) / segs[j].d;
+        return L.latLng(
+          segs[j].a.lat + (segs[j].b.lat - segs[j].a.lat) * local,
+          segs[j].a.lng + (segs[j].b.lng - segs[j].a.lng) * local
+        );
+      }
+    }
+    return latlngs[latlngs.length - 1];
+  }
+
+  function cancelAnim(id) {
+    if (animRafIds[id]) { cancelAnimationFrame(animRafIds[id]); animRafIds[id] = null; }
+  }
+
+  function runLoopAnim(id, marker, latlngs, durationMs, progressFn) {
+    cancelAnim(id);
+    var startTs = null;
+    function frame(ts) {
+      if (!startTs) startTs = ts;
+      var t = ((ts - startTs) % durationMs) / durationMs;
+      marker.setLatLng(latLngAtProgress(latlngs, progressFn ? progressFn(t) : t));
+      animRafIds[id] = requestAnimationFrame(frame);
+    }
+    animRafIds[id] = requestAnimationFrame(frame);
+  }
+
+  function hesitantProgress(t) {
+    var pauses = [[0.28, 0.34], [0.58, 0.66]], scale = 0.72;
+    for (var i = 0; i < pauses.length; i++) {
+      if (t >= pauses[i][0] && t <= pauses[i][1]) return pauses[i][0] * scale;
+    }
+    var adj = t;
+    pauses.forEach(function (p) { if (t > p[1]) adj -= (p[1] - p[0]) * 0.35; });
+    return Math.min(1, adj * scale);
+  }
+
+  function setAnimVisible(marker, show) {
+    var elmk = marker.getElement();
+    if (elmk) elmk.style.display = show ? "block" : "none";
+  }
+
+  function updateWarmPathAnim(storyKey) {
+    cancelAnim("personH");
+    cancelAnim("personS");
+    var story = WARM_BRIDGE_STORIES[storyKey];
+    if (!story || activeMapStory !== storyKey || currentIndex !== 1) return;
+    var path = story.path;
+    var isAncient = routeMode === "ancient";
+    var hEl = animMarkers.personHesitant.getElement();
+    var sEl = animMarkers.personSmooth.getElement();
+    if (hEl) hEl.classList.toggle("person-shake", isAncient);
+    if (sEl) sEl.classList.toggle("person-smile", !isAncient);
+    if (isAncient) {
+      setAnimVisible(animMarkers.personSmooth, false);
+      setAnimVisible(animMarkers.personHesitant, true);
+      runLoopAnim("personH", animMarkers.personHesitant, path, 18000, hesitantProgress);
+    } else {
+      setAnimVisible(animMarkers.personHesitant, false);
+      setAnimVisible(animMarkers.personSmooth, true);
+      runLoopAnim("personS", animMarkers.personSmooth, path, 9000, function (t) { return t; });
+    }
+  }
+
+  function updateDushanPathAnim() { updateWarmPathAnim("dushan"); }
+
+  function startAllAnimations() {
+    cancelAnim("slow");
+    cancelAnim("car");
+    var isAncient = routeMode === "ancient";
+    var bigStory = isBigBridgeKey(activeMapStory) ? BIG_BRIDGE_STORIES[activeMapStory] : null;
+    if (bigStory && currentIndex === 0) {
+      var path = isAncient ? bigStory.oldRoad : bigStory.newRoad;
+      if (isAncient) {
+        setAnimVisible(animMarkers.car, false);
+        setAnimVisible(animMarkers.slowDot, true);
+        runLoopAnim("slow", animMarkers.slowDot, path, 18000, function (t) { return t; });
+      } else {
+        setAnimVisible(animMarkers.slowDot, false);
+        setAnimVisible(animMarkers.car, true);
+        runLoopAnim("car", animMarkers.car, path, 6500, function (t) { return t; });
+      }
+      showBigBridgeLines(activeMapStory, isAncient);
+    } else {
+      setAnimVisible(animMarkers.slowDot, false);
+      setAnimVisible(animMarkers.car, false);
+    }
+    if (isWarmBridgeKey(activeMapStory) && currentIndex === 1) {
+      showWarmBridgeLines(activeMapStory, isAncient);
+      updateWarmPathAnim(activeMapStory);
+    } else {
+      setAnimVisible(animMarkers.personHesitant, false);
+      setAnimVisible(animMarkers.personSmooth, false);
+    }
+    runLoopAnim("corridor", animMarkers.corridorGlow, economicCorridorAnimPath, 20000, function (t) { return t; });
+  }
+
+  function applyBridgeMode(mode) {
+    routeMode = mode;
+    setRouteModeButtons(mode);
+    var isAncient = mode === "ancient";
+    if (isWarmBridgeKey(activeMapStory) && currentIndex === 1) {
+      hideAllWarmBridgeMarkers();
+      updateWarmBridgeMarkers(activeMapStory, isAncient);
+      showWarmBridgeLines(activeMapStory, isAncient);
+    } else if (isBigBridgeKey(activeMapStory) && currentIndex === 0) {
+      showBigBridgeLines(activeMapStory, isAncient);
+    } else {
+      updateWarmBridgeMarkers("dushan", isAncient);
+      if (isAncient) {
+        layers.routes.addLayer(villagerOldLine);
+        if (layers.routes.hasLayer(villagerNewLine)) layers.routes.removeLayer(villagerNewLine);
+      } else {
+        if (layers.routes.hasLayer(villagerOldLine)) layers.routes.removeLayer(villagerOldLine);
+        layers.routes.addLayer(villagerNewLine);
+      }
+    }
+    updateFxVisibility();
+    startAllAnimations();
+    if (currentIndex === 0 && isBigBridgeKey(activeMapStory)) {
+      var story = BIG_BRIDGE_STORIES[activeMapStory];
+      startRouteTimer(isAncient ? story.timerAncient : story.timerModern, isAncient ? story.timerAncientLabel : story.timerModernLabel);
+    }
+  }
+
+  var jumpTargets = {
+    bridge: { center: LOC.bridge, zoom: 13, label: "花江峡谷大桥" },
+    beipan: { center: LOC.beipan, zoom: 13, label: "北盘江大桥" },
+    yachi: { center: LOC.yachi, zoom: 13, label: "鸭池河大桥" },
+    baling: { center: LOC.baling, zoom: 13, label: "坝陵河大桥" },
+    kelizhai: { center: LOC.kelizhai, zoom: 14, label: "科力寨" },
+    xiaohuajiang: { center: LOC.xiaohuajiang, zoom: 14, label: "小花江村" },
+    yunfu: { center: LOC.yunfu, zoom: 14, label: "云渡服务区" },
+    dushan: { center: LOC.dushan, zoom: 12, label: "独山县·麻万镇", useDushanScale: true },
+    leishanSchool: { center: LOC.leishanSchool, zoom: 13, label: "雷山上学桥" },
+    congjiangHealth: { center: LOC.congjiangHealth, zoom: 13, label: "从江健康桥" },
+    gaoqiao: { center: LOC.gaoqiao, zoom: 15, label: "高桥" },
+    tiaodeng: { center: LOC.tiaodeng, zoom: 15, label: "跳等桥" },
+    guiyang: { center: LOC.guiyang, zoom: 12, label: "贵阳枢纽" },
+    zunyi: { center: LOC.zunyi, zoom: 13, label: "遵义片区" },
+    tongren: { center: LOC.tongren, zoom: 13, label: "铜仁片区" },
+    bijie: { center: LOC.bijie, zoom: 13, label: "毕节片区" },
+    kaili: { center: LOC.kaili, zoom: 13, label: "凯里片区" },
+    beipanGuizhou: { center: LOC.beipanGuizhou, zoom: 14, label: "都格镇·贵州侧" },
+    beipanYunnan: { center: LOC.beipanYunnan, zoom: 14, label: "都格镇·云南侧" },
+    yachiGuiyang: { center: LOC.yachiGuiyang, zoom: 14, label: "贵阳方向" },
+    yachiQianxi: { center: LOC.yachiQianxi, zoom: 14, label: "黔西方向" },
+    balingHuangguoshu: { center: LOC.balingHuangguoshu, zoom: 14, label: "黄果树景区" },
+    balingScenic: { center: LOC.balingScenic, zoom: 14, label: "桥旅体验区" },
+    leishanVillageLife: { center: LOC.leishanVillage, zoom: 14, label: "苗寨上学路" },
+    leishanGate: { center: LOC.leishanSchoolGate, zoom: 14, label: "雷山小学" },
+    leishanOldFord: { center: LOC.leishanOldFord, zoom: 15, label: "旧渡点" },
+    congjiangVillageLife: { center: LOC.congjiangVillage, zoom: 14, label: "侗寨人家" },
+    congjiangClinicPt: { center: LOC.congjiangClinic, zoom: 14, label: "乡卫生院" },
+    congjiangOldFord: { center: LOC.congjiangOldFord, zoom: 15, label: "旧桥渡点" }
+  };
+
+  function flyToTarget(key, isStoryJump) {
+    var t = jumpTargets[key];
+    if (!t) return;
+    if (isStoryJump) {
+      activeMapStory = key;
+      if (currentIndex === 0 || currentIndex === 1) {
+        var stepId = STEPS[currentIndex].id;
+        var idx = findSubStoryIndex(stepId, key);
+        if (idx !== subStoryIndex) {
+          subStoryIndex = idx;
+          paintSubStoryPanel(SUB_STORIES[stepId][idx], STEPS[currentIndex]);
+          updateSubStoryControls(SUB_STORIES[stepId], idx);
+        }
+        setRegionButtons(regionForStoryKey(key));
+      }
+    }
+    if (t.useDushanScale) {
+      flyToDushanAtScale();
+      el.mapBadge.innerHTML = "<strong>当前视点</strong> · " + t.label;
+      setTimeout(function () {
+        if (isStoryJump) playWarmBridgeFx(key);
+        else {
+          highlightMarker(markers.dushan);
+          if (markers.newBridgeOk && layers.points.hasLayer(markers.newBridgeOk)) highlightMarker(markers.newBridgeOk);
+        }
+      }, 1300);
+      return;
+    }
+    var maxZoomIn = zoomForScaleBarKm(t.center[0], DUSHAN_SCALE_KM);
+    var zoom = Math.min(t.zoom, maxZoomIn);
+    map.flyTo(t.center, zoom, { duration: 1.2 });
+    el.mapBadge.innerHTML = "<strong>当前视点</strong> · " + t.label;
+    setTimeout(function () {
+      if (isStoryJump && isBigBridgeKey(key) && currentIndex === 0) playBigBridgeFx(key);
+      else if (isStoryJump && isWarmBridgeKey(key) && currentIndex === 1) playWarmBridgeFx(key);
+      else {
+        var mk = markers[key];
+        if (!mk && key === "gaoqiao") mk = routeMode === "ancient" ? markers.gaoqiaoDanger : markers.gaoqiaoOk;
+        if (!mk && key === "tiaodeng") mk = routeMode === "ancient" ? markers.tiaodengDanger : markers.tiaodengOk;
+        if (!mk && key === "leishanOldFord") mk = markers.leishanOldDanger;
+        if (!mk && key === "congjiangOldFord") mk = markers.congjiangOldDanger;
+        if (mk) highlightMarker(mk);
+      }
+    }, 1300);
+  }
+
+  function bindMapJumps() {
+    document.querySelectorAll(".map-jump, .bridge-story-jump").forEach(function (node) {
+      node.addEventListener("click", function (e) {
+        e.preventDefault();
+        flyToTarget(node.getAttribute("data-target"), node.classList.contains("bridge-story-jump"));
+      });
+    });
+  }
+
+  document.getElementById("btnSubStoryPrev").addEventListener("click", function () { goToSubStory(subStoryIndex - 1); });
+  document.getElementById("btnSubStoryNext").addEventListener("click", function () { goToSubStory(subStoryIndex + 1); });
+  document.getElementById("btnPrev").addEventListener("click", function () { goToStep(currentIndex - 1); });
+  document.getElementById("btnNext").addEventListener("click", function () {
+    if (currentIndex < STEPS.length - 1) goToStep(currentIndex + 1);
+  });
+  document.querySelectorAll(".region-btn[data-region]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      goToRegionStory(btn.getAttribute("data-region"));
+    });
+  });
+  document.getElementById("btnMapHome").addEventListener("click", function () { flyToRegion("all", "贵州省域总览"); });
+  document.getElementById("btnZoomIn").addEventListener("click", function () { map.zoomIn(); });
+  document.getElementById("btnZoomOut").addEventListener("click", function () { map.zoomOut(); });
+  document.getElementById("btnReplayAnim").addEventListener("click", function () {
+    var subs = getSubStoriesForStep(STEPS[currentIndex]);
+    if (currentIndex === 0 && subs) playBigBridgeFx(subs[subStoryIndex].key);
+    else if (currentIndex === 1 && subs) playWarmBridgeFx(subs[subStoryIndex].key);
+    else startAllAnimations();
+  });
+  document.getElementById("btnRouteAncient").addEventListener("click", function () { applyBridgeMode("ancient"); });
+  document.getElementById("btnRouteModern").addEventListener("click", function () { applyBridgeMode("modern"); });
+  document.getElementById("basemapSelect").addEventListener("change", function () {
+    applyBasemap(this.value);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight" && currentIndex < STEPS.length - 1) { e.preventDefault(); goToStep(currentIndex + 1); }
+    if (e.key === "ArrowLeft" && currentIndex > 0) { e.preventDefault(); goToStep(currentIndex - 1); }
+  });
+
+  buildStepNav();
+  initMap();
+  applyBridgeMode("ancient");
+  currentIndex = -1;
+  goToStep(0);
+  setTimeout(function () {
+    map.invalidateSize();
+    if (overviewMap) overviewMap.invalidateSize();
+    resizeFxCanvas();
+  }, 300);
+  window.addEventListener("resize", function () {
+    map.invalidateSize();
+    if (overviewMap) overviewMap.invalidateSize();
+    resizeFxCanvas();
+  });
+})();
+  </script>
+</body>
+</html>
