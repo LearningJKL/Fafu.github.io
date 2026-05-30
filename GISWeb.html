@@ -417,6 +417,9 @@
     require([
       "esri/Map",
       "esri/views/MapView",
+      "esri/Basemap",
+      "esri/layers/TileLayer",
+      "esri/layers/WebTileLayer",
       "esri/layers/FeatureLayer",
       "esri/symbols/PictureMarkerSymbol",
       "esri/symbols/SimpleMarkerSymbol",
@@ -427,13 +430,84 @@
       "esri/widgets/Compass",
       "esri/rest/support/Query"
     ], function (
-      Map, MapView, FeatureLayer, PictureMarkerSymbol, SimpleMarkerSymbol,
+      Map, MapView, Basemap, TileLayer, WebTileLayer, FeatureLayer, PictureMarkerSymbol, SimpleMarkerSymbol,
       SimpleRenderer, UniqueValueRenderer, LabelClass, ScaleBar, Compass, Query
     ) {
       var SERVICE_URLS = {
         bridgeBoundary: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省桥梁市界/FeatureServer",
         road: "https://www.geosceneonline.cn/server/rest/services/Hosted/贵州省2026道路数据/FeatureServer"
       };
+
+      var GEOQ_BASE = "https://map.geoq.cn/ArcGIS/rest/services/";
+      var THEMATIC_BASE = "https://thematic.geoq.cn/arcgis/rest/services/ThematicMaps/";
+      var TIANDITU_TK = "9a516b0f2a8179bb68f73172cff4bd22";
+      var TIANDITU_SUBDOMAINS = ["t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7"];
+
+      function createGeoqTileLayer(serviceName) {
+        return new TileLayer({
+          url: GEOQ_BASE + serviceName + "/MapServer"
+        });
+      }
+
+      function createThematicTileLayer(serviceName) {
+        return new TileLayer({
+          url: THEMATIC_BASE + serviceName + "/MapServer"
+        });
+      }
+
+      function createTiandituLayer(layerType) {
+        return new WebTileLayer({
+          urlTemplate: "https://{subDomain}.tianditu.gov.cn/DataServer?T=" + layerType + "&x={col}&y={row}&l={level}&tk=" + TIANDITU_TK,
+          subDomains: TIANDITU_SUBDOMAINS
+        });
+      }
+
+      function createDomesticBasemap(key) {
+        var layerDefs = {
+          streets: {
+            title: "街道图（Streets）",
+            layers: [function () { return createGeoqTileLayer("ChinaOnlineCommunity"); }]
+          },
+          topo: {
+            title: "地形图（Topographic）",
+            layers: [
+              function () { return createTiandituLayer("ter_w"); },
+              function () { return createTiandituLayer("cta_w"); }
+            ]
+          },
+          satellite: {
+            title: "卫星图（Satellite）",
+            layers: [function () { return createTiandituLayer("img_w"); }]
+          },
+          hybrid: {
+            title: "混合图（Hybrid）",
+            layers: [
+              function () { return createTiandituLayer("img_w"); },
+              function () { return createTiandituLayer("cia_w"); }
+            ]
+          },
+          oceans: {
+            title: "海洋图（Oceans）",
+            layers: [function () { return createThematicTileLayer("WorldHydroMap"); }]
+          },
+          gray: {
+            title: "灰色底图（Gray）",
+            layers: [function () { return createGeoqTileLayer("ChinaOnlineStreetGray"); }]
+          },
+          "dark-gray": {
+            title: "深灰底图（Dark Gray）",
+            layers: [function () { return createGeoqTileLayer("ChinaOnlineStreetPurplishBlue"); }]
+          }
+        };
+
+        var def = layerDefs[key] || layerDefs.streets;
+        return new Basemap({
+          title: def.title,
+          baseLayers: def.layers.map(function (createLayer) {
+            return createLayer();
+          })
+        });
+      }
 
       var PIN_RED_SVG =
         "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
@@ -641,7 +715,7 @@
       });
 
       var map = new Map({
-        basemap: "streets",
+        basemap: createDomesticBasemap("streets"),
         layers: [boundaryPolygonLayer, roadLayer, bridgePointLayer]
       });
 
@@ -731,7 +805,7 @@
       }
 
       document.getElementById("basemapSelector").addEventListener("change", function (e) {
-        map.basemap = e.target.value;
+        map.basemap = createDomesticBasemap(e.target.value);
       });
 
       document.getElementById("layerBoundary").addEventListener("change", function (e) {
