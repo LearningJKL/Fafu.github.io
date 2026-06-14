@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <title>福建省土壤专题信息服务平台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v9.2.4/ol.css">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; font-family: "Microsoft YaHei", sans-serif; }
+      .app { display: flex; height: 100%; }
+      .left { width: 200px; background: #2d8a58; color: #fff; }
+      .left h1 { font-size: 15px; padding: 20px 10px; text-align: center; border-bottom: 1px solid #fff3; }
+      .left a { display: block; padding: 10px 15px; color: #fff; text-decoration: none; font-size: 14px; }
+      .left a.active { background: #ffffff22; }
+      .right { width: 260px; background: #fff; border-left: 1px solid #ddd; overflow-y: auto; }
+      .box { padding: 15px; border-bottom: 1px solid #eee; }
+      .box h3 { font-size: 14px; margin-bottom: 10px; color: #333; }
+      .btn { width: 100%; margin-bottom: 8px; padding: 8px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; text-align: left; }
+      .btn.on { background: #2d8a58; color: #fff; border-color: #2d8a58; }
+
+      label { display: block; margin-bottom: 8px; font-size: 14px; }
+
+      #mapBox { flex: 1; position: relative; }
+      #map { width: 100%; height: 100%; }
+      .map-hud { position: absolute; left: 10px; bottom: 10px; z-index: 9; }
+      #scaleBar { background: #fffc; border: 1px solid #ccc; padding: 5px 8px; margin-bottom: 5px; border-radius: 4px; }
+      #scaleBar .ol-scale-line { position: static; background: none; padding: 0; }
+      .info { background: #fffc; border: 1px solid #ccc; padding: 8px 10px; font-size: 12px; border-radius: 4px; line-height: 1.6; }
+
+      #status { margin-top: 8px; padding: 8px; font-size: 12px; background: #fffbe6; border: 1px solid #ffe58f; }
+      #status.ok { background: #f6ffed; border-color: #b7eb8f; }
+      #status.err { background: #fff2f0; border-color: #ffccc7; }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="left">
+        <h1>福建省土壤专题<br>信息服务平台</h1>
+        <a href="#" class="active">地图浏览</a>
+        <a href="#">数据查询</a>
+        <a href="#">统计分析</a>
+        <a href="#">帮助说明</a>
+      </div>
+      <div id="mapBox">
+        <div id="map"></div>
+        <div class="map-hud">
+          <div id="scaleBar"></div>
+          <div class="info">
+            当前视图：<span id="viewName">土壤有效钾</span><br>
+            坐标：<span id="coordText">--</span>
+          </div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="box">
+          <h3>分析工具 · 专题图</h3>
+          <button class="btn on" id="btnPotassium" onclick="setTheme('potassium')">土壤有效钾</button>
+          <button class="btn" id="btnOrganic" onclick="setTheme('organic')">土壤有机质</button>
+        </div>
+        <div class="box">
+          <h3>底图切换</h3>
+          <button class="btn on" id="bmStreet" onclick="setBasemap('street')">街道图</button>
+          <button class="btn" id="bmImagery" onclick="setBasemap('imagery')">影像图</button>
+          <button class="btn" id="bmTerrain" onclick="setBasemap('terrain')">地形图</button>
+          <button class="btn" id="bmGeo" onclick="setBasemap('geoserver')">GeoServer 底图</button>
+        </div>
+        <div class="box">
+          <h3>图层管理</h3>
+          <label><input type="checkbox" id="chkCounty" checked onchange="updateLayers()"> 县级行政界线（xianquFour）</label>
+          <label><input type="checkbox" id="chkOrganic" onchange="updateLayers()"> 土壤有机质（OrganicStoreFour）</label>
+          <label><input type="checkbox" id="chkPotassium" checked onchange="updateLayers()"> 土壤有效钾（PotassiumFour）</label>
+        </div>
+        <div class="box">
+          <h3>加载状态</h3>
+          <div id="status">正在加载...</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ol@v9.2.4/dist/ol.js"></script>
+    <script>
+      var wmsUrl = 'http://localhost:8080/geoserver/wms';
+      var extent2436 = [383568.39, 2603619.11, 882345.52, 3135232.05];
+
+      proj4.defs('EPSG:2436', '+proj=tmerc +lat_0=0 +lon_0=117 +k=1 +x_0=500000 +y_0=0 +ellps=krass +towgs84=15.8,-154.4,-82.3,0,0,0,0 +units=m +no_defs');
+      ol.proj.proj4.register(proj4);
+
+      var mapExtent = ol.proj.transformExtent(extent2436, 'EPSG:2436', 'EPSG:3857');
+      var basemapStreet = new ol.layer.Tile({
+        visible: true,
+        source: new ol.source.XYZ({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+        })
+      });
+      var basemapImagery = new ol.layer.Tile({
+        visible: false,
+        source: new ol.source.XYZ({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        })
+      });
+      var basemapTerrain = new ol.layer.Tile({
+        visible: false,
+        source: new ol.source.XYZ({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'
+        })
+      });
+      var basemapGeo = new ol.layer.Tile({
+        visible: false,
+        source: new ol.source.TileWMS({
+          url: wmsUrl,
+          params: { LAYERS: 'ne:world', SRS: 'EPSG:3857', TILED: true, FORMAT: 'image/png' },
+          serverType: 'geoserver'
+        })
+      });
+      var countyLayer = new ol.layer.Image({
+        zIndex: 1,
+        source: new ol.source.ImageWMS({
+          url: wmsUrl,
+          params: {
+            LAYERS: 'fafuLJK:xianquFour',
+            STYLES: 'FujianXianqu',
+            SRS: 'EPSG:3857',
+            FORMAT: 'image/png',
+            TRANSPARENT: true
+          },
+          serverType: 'geoserver',
+          ratio: 1
+        })
+      });
+      var potassiumLayer = new ol.layer.Tile({
+        zIndex: 2,
+        source: new ol.source.TileWMS({
+          url: wmsUrl,
+          params: {
+            LAYERS: 'fafuLJK:PotassiumFour',
+            STYLES: 'Potassium',
+            SRS: 'EPSG:3857',
+            TILED: true,
+            FORMAT: 'image/png',
+            TRANSPARENT: true
+          },
+          serverType: 'geoserver'
+        })
+      });
+      var organicLayer = new ol.layer.Tile({
+        zIndex: 3,
+        visible: false,
+        source: new ol.source.TileWMS({
+          url: wmsUrl,
+          params: {
+            LAYERS: 'fafuLJK:OrganicStoreFour',
+            STYLES: 'OrganicStore',
+            SRS: 'EPSG:3857',
+            TILED: true,
+            FORMAT: 'image/png',
+            TRANSPARENT: true
+          },
+          serverType: 'geoserver'
+        })
+      });
+      var map = new ol.Map({
+        target: 'map',
+        layers: [basemapStreet, basemapImagery, basemapTerrain, basemapGeo, countyLayer, potassiumLayer, organicLayer],
+        view: new ol.View({ projection: 'EPSG:3857', center: ol.extent.getCenter(mapExtent), zoom: 7 }),
+        controls: [
+          new ol.control.Zoom(),
+          new ol.control.Attribution(),
+          new ol.control.ScaleLine({ units: 'metric', target: document.getElementById('scaleBar') })
+        ]
+      });
+      map.getView().fit(mapExtent, { padding: [30, 30, 30, 30], maxZoom: 10 });
+
+      function showStatus(msg, type) {
+        var el = document.getElementById('status');
+        el.innerText = msg;
+        el.className = type || '';
+      }
+
+      function setTheme(name) {
+        document.getElementById('btnPotassium').className = name === 'potassium' ? 'btn on' : 'btn';
+        document.getElementById('btnOrganic').className = name === 'organic' ? 'btn on' : 'btn';
+        if (name === 'potassium') {
+          document.getElementById('viewName').innerText = '土壤有效钾';
+          document.getElementById('chkCounty').checked = true;
+          document.getElementById('chkOrganic').checked = false;
+          document.getElementById('chkPotassium').checked = true;
+        } else {
+          document.getElementById('viewName').innerText = '土壤有机质';
+          document.getElementById('chkCounty').checked = true;
+          document.getElementById('chkOrganic').checked = true;
+          document.getElementById('chkPotassium').checked = false;
+        }
+        updateLayers();
+      }
+
+      function setBasemap(name) {
+        basemapStreet.setVisible(name === 'street');
+        basemapImagery.setVisible(name === 'imagery');
+        basemapTerrain.setVisible(name === 'terrain');
+        basemapGeo.setVisible(name === 'geoserver');
+        var ids = ['bmStreet', 'bmImagery', 'bmTerrain', 'bmGeo'];
+        var keys = ['street', 'imagery', 'terrain', 'geoserver'];
+        for (var i = 0; i < ids.length; i++) {
+          document.getElementById(ids[i]).className = name === keys[i] ? 'btn on' : 'btn';
+        }
+      }
+
+      function updateLayers() {
+        countyLayer.setVisible(document.getElementById('chkCounty').checked);
+        organicLayer.setVisible(document.getElementById('chkOrganic').checked);
+        potassiumLayer.setVisible(document.getElementById('chkPotassium').checked);
+      }
+
+      map.on('pointermove', function (e) {
+        var c = ol.proj.transform(e.coordinate, 'EPSG:3857', 'EPSG:2436');
+        document.getElementById('coordText').innerText =
+          'X: ' + c[0].toFixed(2) + '，Y: ' + c[1].toFixed(2) + '（EPSG:2436）';
+      });
+
+      potassiumLayer.getSource().on('tileloadend', function () {
+        showStatus('地图加载成功', 'ok');
+      });
+      potassiumLayer.getSource().on('tileloaderror', function () {
+        showStatus('图层加载失败，请检查 GeoServer 是否启动', 'err');
+      });
+      countyLayer.getSource().on('imageloaderror', function () {
+        showStatus('县区图层加载失败', 'err');
+      });
+      updateLayers();
+      showStatus('初始化完成，默认街道图 + 土壤有效钾');
+    </script>
+  </body>
+</html>
